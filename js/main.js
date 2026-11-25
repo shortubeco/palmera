@@ -4,6 +4,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { clamp, damp, dampAngle, wrapAngle, formatMoney } from './util.js';
 import { World, WATER_Y } from './world.js';
 import { Environment, START_HOUR } from './env.js';
@@ -50,6 +51,31 @@ function disposeUnused(roots, scene, keepKit) {
   for (const t of texs) if (!kT.has(t)) t.dispose();
   for (const s of skels) s.dispose();
 }
+
+// Çizgi film görünümü: son ekran rengi (ton eşlemeden sonra, ekran uzayında) — canlı, doygun, sıcak ışık / mor gölge.
+// Tek tam ekran geçişi; kapatılınca (?toon=0) pass devre dışı, görüntü eskisiyle birebir aynı.
+const TOON_GRADE = {
+  uniforms: { tDiffuse: { value: null }, uSat: { value: 0.5 }, uContrast: { value: 0.32 }, uNight: { value: 0 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `
+uniform sampler2D tDiffuse; uniform float uSat, uContrast, uNight; varying vec2 vUv;
+void main(){
+  vec4 tex = texture2D(tDiffuse, vUv);
+  vec3 c = clamp(tex.rgb, 0.0, 1.0);
+  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  // canlılık: soluk renkler çok, zaten doygun olanlar az artar; çok karanlıkta artmaz (gürültü olmasın)
+  float s = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
+  float k = uSat * (1.0 - s * 0.7) * smoothstep(0.03, 0.2, l);
+  c = clamp(mix(vec3(l), c, 1.0 + k), 0.0, 1.0);
+  // S eğrisi karşıtlık (gece yumuşak, yoksa karanlık yerler kapkara olur)
+  c = mix(c, c * c * (3.0 - 2.0 * c), uContrast * (1.0 - uNight * 0.6));
+  // ayrık ton: gölgeler mor-maviye, ışıklar sıcak sarıya
+  float w = smoothstep(0.15, 0.75, l);
+  c += vec3(0.025, -0.01, 0.06) * (1.0 - w) * (1.0 - l);
+  c += vec3(0.05, 0.025, -0.03) * w * l;
+  gl_FragColor = vec4(clamp(c, 0.0, 1.0), tex.a);
+}`,
+};
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -140,6 +166,11 @@ class Game {
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.7, 0.55, 0.85);
     if (this.quality !== 'low') this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
+    this.toonPass = new ShaderPass(TOON_GRADE);
+    this.composer.addPass(this.toonPass);
+    // çizgi film görünümü: varsayılan açık; ?toon=0 / ?toon=1 ya da localStorage pn_toon ('off' / 'on')
+    const tq = params.get('toon');
+    this.setToon(tq != null ? tq !== '0' : localStorageGet('pn_toon') !== 'off');
 
     this.cam = { yaw: -Math.PI / 2, pitch: 0.18, lookT: 0, dist: 1 };
     this.effects.setScale(innerHeight, this.camera.fov);
@@ -207,6 +238,14 @@ class Game {
     $('pause').classList.toggle('hidden', !p);
     if (!p) { this.lock(); this.clock.getDelta(); }
     this.audio.ctx && (p ? this.audio.ctx.suspend() : this.audio.ctx.resume());
+  }
+  // çizgi film görünümü aç/kapa: son renk geçişi + boyalı gökyüzü + daha az sis (kapalıyken eski görüntü)
+  setToon(on) {
+    this.toon = !!on;
+    this.toonPass.enabled = this.toon;
+    this.env.toon = this.toon;
+    this.env.skyUniforms.uToon.value = this.toon ? 1 : 0;
+    this.env.envTimer = 0;   // çevre haritası (yansımalar) yeni gökyüzüyle yenilensin
   }
   resize() {
     this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix();
@@ -808,6 +847,7 @@ class Game {
     this.effects.update(dt);
     this.bloom.strength = 0.38 + this.env.night * 0.42 + this.env.wet * 0.08;
     this.bloom.threshold = 0.92 - this.env.night * 0.1;
+    this.toonPass.uniforms.uNight.value = this.env.night;
     // oyuncu farları
     const hv = P.vehicle;
     if (hv && this.env.night > 0.15 && !hv.wrecked && hv.type !== 'horse' && hv.type !== 'wagon') {   // at ve at arabasında far yok

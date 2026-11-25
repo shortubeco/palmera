@@ -22,8 +22,10 @@ const KEYS = [
 
 const skyVert = `varying vec3 vDir; void main(){ vDir = position; vec4 p = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w * 0.99999; }`;
 const skyFrag = `
-uniform vec3 uZenith, uHorizon, uSunDir, uSunCol, uMoonDir; uniform float uNight, uTime, uCloud, uRain, uFlash, uEnv;
+uniform vec3 uZenith, uHorizon, uSunDir, uSunCol, uMoonDir; uniform float uNight, uTime, uCloud, uRain, uFlash, uEnv, uToon;
 varying vec3 vDir;
+// çizgi film: değeri yumuşak kenarlı n basamağa böler (boyanmış gibi renk bantları)
+float bands(float t, float n){ float s = t * n; return (floor(s) + smoothstep(0.4, 0.6, fract(s))) / n; }
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
 float hash3(vec3 p){ return fract(sin(dot(p, vec3(127.1,311.7,74.7)))*43758.5453); }
 float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
@@ -32,12 +34,22 @@ float fbm(vec2 p){ float v=0.0, a=0.5; for(int i=0;i<5;i++){ v+=a*noise(p); p*=2
 void main(){
   vec3 d = normalize(vDir);
   float h = d.y;
-  vec3 col = mix(uHorizon, uZenith, pow(smoothstep(-0.02, 0.65, h), 0.55));
+  float gt = pow(smoothstep(-0.02, 0.65, h), 0.55);
+  gt = mix(gt, bands(gt, 6.0), uToon);
+  vec3 col = mix(uHorizon, uZenith, gt);
   col = mix(col, uHorizon * 0.55, smoothstep(0.0, -0.25, h));
   float sd = max(dot(d, uSunDir), 0.0);
   float sunUp = smoothstep(-0.15, 0.05, uSunDir.y);
   col += uSunCol * (pow(sd, 6.0) * 0.35 + pow(sd, 48.0) * 0.6) * sunUp * (1.0 - uRain * 0.8);
-  col += uSunCol * smoothstep(0.9993, 0.9997, sd) * mix(12.0, 1.5, uEnv) * sunUp * (1.0 - uRain);
+  if (uToon > 0.5) {
+    // büyük, düz boyalı güneş + çevresinde yumuşak hale (gün batımında iri ve sıcak)
+    float disc = smoothstep(0.9962, 0.9968, sd);
+    float ring = smoothstep(0.985, 0.9962, sd) * (1.0 - disc);
+    col = mix(col, uSunCol * mix(2.2, 1.2, uEnv) + vec3(0.25, 0.2, 0.05), disc * sunUp * (1.0 - uRain));
+    col += uSunCol * ring * 0.35 * sunUp * (1.0 - uRain);
+  } else {
+    col += uSunCol * smoothstep(0.9993, 0.9997, sd) * mix(12.0, 1.5, uEnv) * sunUp * (1.0 - uRain);
+  }
   // bulutlar
   if (h > 0.0) {
     vec2 uv = d.xz / (h + 0.18) * 1.4 + vec2(uTime * 0.004, uTime * 0.0015);
@@ -45,6 +57,16 @@ void main(){
     float cov = mix(0.58, 0.28, uCloud);
     float cm = smoothstep(cov, cov + 0.32, c) * smoothstep(0.0, 0.18, h);
     vec3 lit = mix(uZenith * 0.7 + uHorizon * 0.4, uSunCol * 1.1 + uHorizon * 0.6, 0.35 + 0.65 * pow(sd, 3.0));
+    if (uToon > 0.5) {
+      // keskin kenarlı bulut + iki tonlu boyama: güneşe bakan kenar aydınlık, alt/iç gölge
+      cm = smoothstep(cov + 0.04, cov + 0.09, c) * smoothstep(0.0, 0.12, h);
+      float c2 = fbm(uv * 1.3 - uSunDir.xz * 0.12);
+      float edge = smoothstep(-0.01, 0.03, c - c2);
+      vec3 shade = mix(uZenith, uHorizon, 0.55) * 0.82 + uSunCol * 0.08;
+      vec3 light = uSunCol * 0.9 + uHorizon * 0.55;
+      lit = mix(shade, light, edge * (0.45 + 0.55 * pow(sd, 2.0)) + 0.15);
+      lit *= mix(1.0, 0.45, uNight);   // gece bulutlar ay ışığında sönük kalsın
+    }
     lit = mix(lit, vec3(0.32,0.33,0.38) * (0.25 + 0.75*(1.0-uNight)), uRain * 0.75);
     col = mix(col, lit, cm * 0.85);
     // yıldızlar
@@ -130,8 +152,9 @@ export class Environment {
     this.skyUniforms = {
       uZenith: { value: new THREE.Color() }, uHorizon: { value: new THREE.Color() }, uSunDir: { value: new THREE.Vector3(0, 1, 0) },
       uSunCol: { value: new THREE.Color() }, uMoonDir: { value: new THREE.Vector3(0, 1, 0) }, uNight: { value: 0 }, uTime: { value: 0 },
-      uCloud: { value: 0.3 }, uRain: { value: 0 }, uFlash: { value: 0 }, uEnv: { value: 0 },
+      uCloud: { value: 0.3 }, uRain: { value: 0 }, uFlash: { value: 0 }, uEnv: { value: 0 }, uToon: { value: 0 },
     };
+    this.toon = false;   // çizgi film görünümü (main.js setToon)
     const skyMat = new THREE.ShaderMaterial({ uniforms: this.skyUniforms, vertexShader: skyVert, fragmentShader: skyFrag, side: THREE.BackSide, depthWrite: false, fog: false });
     this.sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 32, 16), skyMat);
     this.sky.frustumCulled = false; this.sky.renderOrder = -10;
@@ -289,7 +312,8 @@ export class Environment {
 
     this.scene.fog.color.copy(fogc);
     // fogScale: bölgeye göre sis çarpanı (Casablanca daha açık)
-    this.scene.fog.density = (0.0017 + this.night * 0.0006) * (this.fogScale ?? 1) + this.rain * 0.0045;
+    // çizgi film görünümünde sis %30 az (uzak renkler solmasın)
+    this.scene.fog.density = (0.0017 + this.night * 0.0006) * (this.fogScale ?? 1) * (this.toon ? 0.7 : 1) + this.rain * 0.0045;
 
     const wu = this.waterUniforms;
     wu.uTime.value = this.time; wu.uFogDensity.value = this.scene.fog.density; wu.uNight.value = this.night; wu.uRain.value = this.rain;
