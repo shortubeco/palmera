@@ -116,7 +116,7 @@ window.ASSET_SIZES = <?= json_encode((object) $sizes) ?>;</script>
   <div id="notify"></div>
   <div id="radiopop"></div>
   <div id="missioncard"></div>
-  <div id="big"><div id="bigtitle"></div><div id="bigsub"></div></div>
+  <div id="big"><div id="bigtitle"></div><div id="bigsub"></div><div id="bignote"></div></div>
   <div id="lockhint" class="hidden">Fare ile bakmak için oyuna tıkla</div>
 </div>
 

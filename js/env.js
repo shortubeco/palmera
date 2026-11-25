@@ -132,16 +132,26 @@ void main(){
 }`;
 const rainFrag = `uniform vec3 uColor; varying float vA; void main(){ gl_FragColor = vec4(uColor, 0.32 * vA); }`;
 
-export const START_HOUR = 8;   // oyun açılışı ve "oyunun başına dön" saati (kullanıcı isteği)
+export const START_HOUR = 8;   // (eski sabit açılış saati; artık randomStartHour kullanılır)
+// oyun açılışı ve "oyunun başına dön": her seferinde farklı saat (sabah … gece yarısı), bir öncekiyle aynısı gelmez
+// (kullanıcı: aynı oyunu oynayıp sıkılmasın; saat görev başında değil oyun başında değişir)
+const START_HOURS = [7.5, 10, 13, 16.5, 18.7, 19.6, 21.5, 23.5, 1.5];
+let lastStartIdx = -1;
+export function randomStartHour() {
+  let i; do { i = Math.floor(Math.random() * START_HOURS.length); } while (i === lastStartIdx);
+  lastStartIdx = i;
+  return (START_HOURS[i] + (Math.random() - 0.5) * 0.4 + 24) % 24;
+}
 export class Environment {
   constructor(renderer, scene, world) {
     this.renderer = renderer; this.scene = scene; this.world = world;
-    this.hour = START_HOUR;     // sabah 08:00'de başla
+    this.hour = randomStartHour();   // her açılışta farklı saat
     this.daySeconds = 1440;     // bir gün = 24 dakika
     this.night = 0; this.wet = 0; this.rain = 0; this.rainTarget = 0;
     this.flash = 0; this.lightningTimer = 8;
     // yağmur takvimi (oyun saati, mutlak): her yağmurdan sonra 2–7 gün sonra yeniden
     this.clock = this.hour;     // başlangıçtan beri geçen oyun saati (gün = 24)
+    this.cloud = this.cloudTarget = 0.25; this.cloudUntil = 0;   // bulutluluk (gökyüzü uCloud tabanı)
     this.resetWeather();
     this.time = 0;
     this.sunDir = new THREE.Vector3();
@@ -242,13 +252,31 @@ export class Environment {
     this.rainEndAt = Infinity;
   }
   // yağmuru kes ve takvimi baştan kur (yeni oyun / başa dönüş)
-  resetWeather() { this.rain = this.rainTarget = 0; this.wet = 0; this.scheduleRain(); }
+  resetWeather() { this.rain = this.rainTarget = 0; this.wet = 0; this.cloud = this.cloudTarget = 0.25; this.cloudUntil = 0; this.scheduleRain(); }
   // hemen yağdır (test: ?rain=1); hours verilmezse durmaz
   forceRain(hours = Infinity) { this.rain = this.rainTarget = 1; this.wet = 1; this.nextRainAt = this.clock; this.rainEndAt = this.clock + hours; }
+
+  // görev başında hava (missions.js): 'sun' açık, 'cloudy' kapalı/bulutlu, 'rain' yağmurlu.
+  // Bulut ve yağmur birkaç oyun saati sürer, sonra hava kendiliğinden açılır (yağmur takvimi baştan kurulur).
+  setWeather(kind) {
+    if (kind === 'rain') {
+      this.rain = this.rainTarget = 0.6 + Math.random() * 0.4; this.wet = 1;
+      this.nextRainAt = this.clock; this.rainEndAt = this.clock + 2 + Math.random() * 2;
+      this.cloudTarget = 0.25; this.cloudUntil = 0;
+    } else {
+      this.rain = this.rainTarget = 0; this.wet = 0; this.scheduleRain();
+      this.cloud = this.cloudTarget = kind === 'cloudy' ? 0.72 : 0.12;
+      this.cloudUntil = this.clock + 3 + Math.random() * 2;
+    }
+    this.envTimer = 0;
+  }
 
   // hava durumu: takvime göre başlar, 2–5 oyun saati sürer; dh = geçen oyun saati
   tickWeather(dh) {
     this.clock += dh;
+    // görev başında seçilen bulutluluk süresi dolunca normale (0,25) yavaşça döner
+    if (this.cloudUntil && this.clock >= this.cloudUntil) { this.cloudTarget = 0.25; this.cloudUntil = 0; }
+    this.cloud += (this.cloudTarget - this.cloud) * Math.min(1, dh * 0.8);
     if (this.rainTarget === 0 && this.clock >= this.nextRainAt) {
       this.rainTarget = 0.55 + Math.random() * 0.45;
       this.rainEndAt = this.clock + 2 + Math.random() * 3;
@@ -290,7 +318,7 @@ export class Environment {
 
     const su = this.skyUniforms;
     su.uZenith.value.copy(zen); su.uHorizon.value.copy(hor); su.uSunDir.value.copy(this.sunDir); su.uSunCol.value.copy(c.sun);
-    su.uMoonDir.value.copy(this.moonDir); su.uNight.value = this.night; su.uTime.value = this.time; su.uCloud.value = 0.25 + this.rain * 0.75;
+    su.uMoonDir.value.copy(this.moonDir); su.uNight.value = this.night; su.uTime.value = this.time; su.uCloud.value = Math.max(this.cloud, 0.25 + this.rain * 0.75);
     su.uRain.value = this.rain; su.uFlash.value = this.flash * 0.6;
     this.sky.position.copy(camera.position);
     this.water.position.x = Math.round(camera.position.x / 100) * 100;
@@ -300,7 +328,7 @@ export class Environment {
     const sunUp = this.sunDir.y > 0.02;
     const ldir = sunUp ? this.sunDir : this.moonDir;
     const lint = sunUp ? c.sunInt * smoothstep(0.0, 0.12, this.sunDir.y) + 0.0 : 0.38;
-    this.sunLight.intensity = Math.max(sunUp ? 0.1 : 0.3, lint) * (1 - this.rain * 0.65);
+    this.sunLight.intensity = Math.max(sunUp ? 0.1 : 0.3, lint) * (1 - this.rain * 0.65) * (1 - Math.max(0, this.cloud - 0.25) * 0.5);
     this.sunLight.color.copy(sunUp ? c.sun : new THREE.Color('#8fa0e0'));
     // gölge kamerasını texel ızgarasına oturt
     const snap = 150 / 2048;

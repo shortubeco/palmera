@@ -106,6 +106,11 @@ function currentPlayerId(): ?int {
 }
 
 // oyuncunun durumu + sıraları (ESC penceresi, oyun sayfası)
+function playedBefore(int $pid): bool {
+    $st = db()->prepare('SELECT EXISTS (SELECT 1 FROM attempts WHERE player_id = ?)');
+    $st->execute([$pid]);
+    return (bool) $st->fetchColumn();
+}
 function playerState(int $pid): ?array {
     $pdo = db();
     $st = $pdo->prepare('SELECT id, username, league, stage, money, city FROM players WHERE id = ?');
@@ -135,6 +140,8 @@ function playerState(int $pid): ?array {
         'money' => (int) $p['money'], 'city' => $p['city'], 'missionKey' => $key,
         'moneyRank' => $moneyRank, 'leaguePlayers' => (int) $n->fetchColumn(),
         'bestMs' => $best === false ? null : (int) $best, 'timeRank' => $timeRank, 'timeCount' => $timeCount,
+        // hiç görev başlatmamış (yeni üye): oyun 15:00'te açılır, sonrakilerde saat rastgele (main.js)
+        'played' => playedBefore($pid),
     ];
 }
 

@@ -7,7 +7,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { clamp, damp, dampAngle, wrapAngle, formatMoney } from './util.js';
 import { World, WATER_Y } from './world.js';
-import { Environment, START_HOUR } from './env.js';
+import { Environment, randomStartHour } from './env.js';
 import { Effects } from './effects.js';
 import { Input } from './input.js';
 import { Vehicle, loadVehicleKit, setWagonKits, setAnimalKit } from './vehicles.js';
@@ -131,6 +131,8 @@ class Game {
       sh.mapSize.set(1024, 1024);
       sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40; sc.updateProjectionMatrix();
     }
+    // yeni üye (hiç görev başlatmamış): ilk oyun 15:00'te; sonraki açılışlarda saat rastgele (env.randomStartHour)
+    if (this.league.me.played === false) this.env.hour = 15;
     if (params.get('t')) this.env.hour = parseFloat(params.get('t'));
     if (params.get('rain')) this.env.forceRain();
     this.effects = new Effects(this.scene);
@@ -469,7 +471,7 @@ class Game {
       this.missions.start(m);
     } else {
       P.respawn(190.5, 52, -Math.PI / 2);
-      this.cam.yaw = -Math.PI / 2; this.env.hour = START_HOUR;
+      this.cam.yaw = -Math.PI / 2; this.env.hour = randomStartHour(); this.env.envTimer = 0;
       if (!silent) this.hud.notify('Oyunun başına döndün. Paran ve ligin duruyor.', 5);
     }
     this.cam.pitch = 0.18; this._camInit = false;

@@ -83,8 +83,8 @@ const FUSE_R = 1.9, FUSE_Y = 3.0;
 function buildPlane() {
   const g = new THREE.Group();
   const white = new THREE.MeshStandardMaterial({ color: '#f4f2ee', roughness: 0.45, metalness: 0.15 });
-  const pink = new THREE.MeshStandardMaterial({ color: '#ff4fa0', roughness: 0.5 });
-  const teal = new THREE.MeshStandardMaterial({ color: '#21c7d9', roughness: 0.5 });
+  const pink = new THREE.MeshStandardMaterial({ color: '#d4232c', roughness: 0.5 });
+  const teal = new THREE.MeshStandardMaterial({ color: '#1d4fb5', roughness: 0.5 });
   const grey = new THREE.MeshStandardMaterial({ color: '#9aa0a8', roughness: 0.4, metalness: 0.5 });
   const dark = new THREE.MeshStandardMaterial({ color: '#1d2230', roughness: 0.3, metalness: 0.2 });
   const tire = new THREE.MeshStandardMaterial({ color: '#151515', roughness: 0.9 });
@@ -93,63 +93,145 @@ function buildPlane() {
     const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz);
     m.castShadow = true; m.receiveShadow = true; g.add(m); return m;
   };
-  // gövde, burun, kuyruk konisi
-  add(new THREE.CylinderGeometry(FUSE_R, FUSE_R, 21, 24), white, 0, FUSE_Y, 0.5, Math.PI / 2);
-  const nose = add(new THREE.SphereGeometry(FUSE_R, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2), white, 0, FUSE_Y, 11, Math.PI / 2);
-  nose.scale.set(1, 2.3, 1);
-  add(new THREE.CylinderGeometry(0.55, FUSE_R, 8, 24), white, 0, FUSE_Y + 0.6, -14, -Math.PI / 2 + 0.15);
-  // kokpit camı, yolcu pencere şeritleri, pembe/camgöbeği şerit
-  add(new THREE.BoxGeometry(2.3, 0.55, 1.4), dark, 0, FUSE_Y + 0.95, 13.1, -0.5);
-  for (const s of [-1, 1]) {
-    add(new THREE.BoxGeometry(0.08, 0.42, 17), win, s * (FUSE_R - 0.02), FUSE_Y + 0.55, -0.6);
-    add(new THREE.BoxGeometry(0.08, 0.32, 27), pink, s * (FUSE_R - 0.03), FUSE_Y - 0.35, -1.5);
-    add(new THREE.BoxGeometry(0.08, 0.16, 27), teal, s * (FUSE_R - 0.03), FUSE_Y - 0.62, -1.5);
-  }
-  // kapı (sol ön: yerel +x)
-  add(new THREE.BoxGeometry(0.06, 1.9, 0.95), grey, FUSE_R + 0.01, FUSE_Y - 0.15, 9);
-  // yazı: PALMERA AIR (iki yan)
-  const tex = textDecal('PALMERA AIR', '#ff3fa4', 'rgba(0,0,0,0)', 512, 96, 'italic 900 64px Impact, Arial Black, sans-serif');
-  const decal = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
-  for (const s of [-1, 1]) {
-    const d = add(new THREE.PlaneGeometry(7, 1.3), decal, s * (FUSE_R + 0.03), FUSE_Y + 1.25, 2, 0, s * Math.PI / 2);
-    d.castShadow = false;
-  }
-  // kanatlar (geriye ok açılı), motorlar, kanat ucu
-  for (const s of [-1, 1]) {
-    const wing = add(new THREE.BoxGeometry(12.5, 0.32, 4.2), white, s * 7.6, FUSE_Y - 1.0, -1.2, 0, s * 0.38, s * 0.06);
-    void wing;
-    add(new THREE.BoxGeometry(0.25, 1.4, 1.3), teal, s * 13.6, FUSE_Y - 0.2, -4.8, 0, 0, s * -0.25);
-    add(new THREE.CylinderGeometry(0.85, 0.75, 3.8, 18), grey, s * 5.2, FUSE_Y - 1.95, 0.6, Math.PI / 2);
-    add(new THREE.CylinderGeometry(0.62, 0.62, 0.1, 18), dark, s * 5.2, FUSE_Y - 1.95, 2.4, Math.PI / 2);
-    add(new THREE.BoxGeometry(0.25, 0.8, 1.6), white, s * 5.2, FUSE_Y - 1.35, 0.2);
-    // fan: göbek + 8 kanat, motor ağzında döner (kalkışta hızlanır, inince yavaşlayıp durur)
-    const fan = new THREE.Group(); fan.position.set(s * 5.2, FUSE_Y - 1.95, 2.5);
-    const hub = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.35, 12), grey); hub.rotation.x = Math.PI / 2; hub.position.z = 0.1; fan.add(hub);
-    for (let k = 0; k < 8; k++) {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.6, 0.04), grey);
-      b.position.set(Math.sin(k * Math.PI / 4) * 0.36, Math.cos(k * Math.PI / 4) * 0.36, 0); b.rotation.z = -k * Math.PI / 4; b.rotation.y = 0.5;
-      fan.add(b);
+  // ---- gövde: dönel profil (yuvarlak burun, kuyruğa incelen + yukarı kalkan koni), renkler köşe rengiyle ----
+  const NOSE0 = 8.5, NOSE_L = 6.1, TAIL0 = -9.5, TAIL_L = 8.5;
+  const rAt = (z) => z > NOSE0 ? FUSE_R * Math.sqrt(Math.max(0, 1 - ((z - NOSE0) / NOSE_L) ** 2))
+    : z < TAIL0 ? 0.32 + (FUSE_R - 0.32) * Math.sqrt(Math.max(0, (z - (TAIL0 - TAIL_L)) / TAIL_L)) : FUSE_R;
+  const yOff = (z) => z < TAIL0 ? ((TAIL0 - z) / TAIL_L) ** 1.5 * 1.35 : z > NOSE0 ? -(((z - NOSE0) / NOSE_L) ** 2) * 0.35 : 0;
+  const prof = [];
+  for (let i = 0; i <= 90; i++) { const z = (TAIL0 - TAIL_L) + (NOSE0 + NOSE_L - (TAIL0 - TAIL_L)) * i / 90; prof.push(new THREE.Vector2(Math.max(rAt(z), 0.001), z)); }
+  const fg = new THREE.LatheGeometry(prof, 96);
+  fg.rotateX(Math.PI / 2);   // dönme ekseni y → z; (x, y, z) → (x, −z, y)
+  {
+    const p = fg.attributes.position, col = new Float32Array(p.count * 3), c = new THREE.Color();
+    const W = new THREE.Color('#f6f4f0'), PK = new THREE.Color('#d4232c'), TL = new THREE.Color('#1d4fb5'), BL = new THREE.Color('#c9ccd4');
+    for (let i = 0; i < p.count; i++) {
+      // lathe y → −z: dönüşten sonra y ekseni aslında −z oldu; burada profil z'si = p.z
+      const z = p.getZ(i), y = p.getY(i), r = Math.max(rAt(z), 0.001), yy = y / FUSE_R;
+      // şerit: pencerelerin altında pembe + camgöbeği, kuyruğa doğru yukarı kıvrılır; karın açık gri
+      const lift = 0, mid = z > -11.5 && z < 11.6;   // düz şerit (kıvrımlı hali köşe çözünürlüğünde tırtıklı görünüyordu)
+      if (y / r < -0.62) c.copy(BL);
+      else if (mid && yy > -0.12 + lift && yy < 0.07 + lift) c.copy(PK);
+      else if (mid && yy > -0.27 + lift && yy < -0.16 + lift) c.copy(TL);
+      else c.copy(W);
+      col.set([c.r, c.g, c.b], i * 3);
+      p.setY(i, y + yOff(z));
     }
-    g.add(fan); (g.userData.fans = g.userData.fans || []).push(fan);
+    fg.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    fg.computeVertexNormals();
   }
-  // kuyruk: dikey (camgöbeği, pembe çizgi) + yatay dengeleyiciler
-  add(new THREE.BoxGeometry(0.32, 5.2, 3.6), teal, 0, FUSE_Y + 3.6, -14.6, -0.42);
-  add(new THREE.BoxGeometry(0.34, 0.5, 3.4), pink, 0, FUSE_Y + 4.6, -15.1, -0.42);
-  for (const s of [-1, 1]) add(new THREE.BoxGeometry(5, 0.22, 2.2), white, s * 2.8, FUSE_Y + 1.1, -15.6, 0, s * 0.3);
-  // iniş takımı
-  const wheel = new THREE.CylinderGeometry(0.55, 0.55, 0.4, 14);
-  add(new THREE.CylinderGeometry(0.12, 0.12, FUSE_Y - 1.2, 8), grey, 0, (FUSE_Y - 1.2) / 2 + 0.5, 9.5);
-  add(wheel, tire, 0, 0.55, 9.5, 0, 0, Math.PI / 2);
+  const bodyMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0.12 });
+  add(fg, bodyMat, 0, FUSE_Y, 0);
+  // kokpit camları: burnun üstünde koyu kuşak + dikmeler
+  {
+    const z0 = 11.55, z1 = 12.45, r0 = rAt(z0) + 0.025, r1 = rAt(z1) + 0.025;
+    const cg = new THREE.CylinderGeometry(r1, r0, z1 - z0, 24, 1, true, Math.PI - 0.85, 1.7);
+    cg.rotateX(Math.PI / 2);
+    const cw = add(cg, new THREE.MeshStandardMaterial({ color: '#16202e', roughness: 0.12, metalness: 0.5, side: THREE.DoubleSide }), 0, FUSE_Y + yOff((z0 + z1) / 2), (z0 + z1) / 2);
+    cw.castShadow = false;
+  }
+  // yolcu pencereleri: iki yanda tek tek (gece yanar)
+  {
+    const wg = new THREE.CylinderGeometry(0.15, 0.15, 0.05, 12); wg.rotateZ(Math.PI / 2); wg.scale(1, 1.35, 1);
+    const zs = []; for (let z = -8.2; z <= 7.6; z += 0.62) if (Math.abs(z - 9) > 0.8) zs.push(z);
+    const wm = new THREE.InstancedMesh(wg, win, zs.length * 2), o = new THREE.Object3D(), wy = 0.55;
+    let k = 0;
+    for (const s of [-1, 1]) for (const z of zs) { o.position.set(s * Math.sqrt(FUSE_R ** 2 - wy ** 2), FUSE_Y + wy, z); o.updateMatrix(); wm.setMatrixAt(k++, o.matrix); }
+    g.add(wm);
+  }
+  // kapı (sol ön: yerel +x) + koyu çerçeve
+  add(new THREE.BoxGeometry(0.05, 2.0, 1.05), dark, FUSE_R - 0.02, FUSE_Y - 0.1, 9);
+  add(new THREE.BoxGeometry(0.06, 1.88, 0.93), white, FUSE_R - 0.005, FUSE_Y - 0.1, 9);
+  // yazı: PALMERA AIR, gövde eğrisine oturan şerit (iki yan; her yandan soldan sağa okunur)
+  const tex = textDecal('PALMERA AIR', '#1d4fb5', 'rgba(0,0,0,0)', 512, 96, 'italic 900 64px Impact, Arial Black, sans-serif');
+  const decal = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
   for (const s of [-1, 1]) {
-    add(new THREE.CylinderGeometry(0.16, 0.16, FUSE_Y - 1.5, 8), grey, s * 2.4, (FUSE_Y - 1.5) / 2 + 0.5, -1.2);
-    add(wheel, tire, s * 2.4, 0.55, -0.9, 0, 0, Math.PI / 2);
-    add(wheel, tire, s * 2.4, 0.55, -1.6, 0, 0, Math.PI / 2);
+    const dg = new THREE.PlaneGeometry(7, 0.9, 24, 6), dp = dg.attributes.position, Yc = 1.25, zc = 1.5;
+    for (let i = 0; i < dp.count; i++) {
+      const px = dp.getX(i), py = dp.getY(i), yy = Yc + py;
+      dp.setXYZ(i, s * Math.sqrt(Math.max(0.01, (FUSE_R + 0.02) ** 2 - yy * yy)), FUSE_Y + yy, zc - s * px);
+    }
+    const d = new THREE.Mesh(dg, decal); g.add(d);
   }
-  // seyir fenerleri (sol kırmızı, sağ yeşil, kuyruk beyaz)
+  // ---- kanat, motor, kuyruk: düzlem biçiminden kalınlaştırılmış (yuvarlak kenarlı) parçalar ----
+  // pts: [[x, z], …] üstten görünüş; thick: kalınlık (y). Ayna (s = −1) için x çevrilir, sıra ters çevrilir.
+  const slab = (pts, thick, s = 1, bevel = 0.08) => {
+    const P = s > 0 ? pts : pts.slice().reverse();
+    const sh = new THREE.Shape(P.map(([x, z]) => new THREE.Vector2(s * x, z)));
+    const eg = new THREE.ExtrudeGeometry(sh, { depth: thick, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 4 });
+    eg.rotateX(Math.PI / 2); eg.translate(0, thick / 2, 0);   // şekil y → z, kalınlık aşağı; ortala
+    eg.computeVertexNormals();
+    return eg;
+  };
+  // yan görünüş parçası (kuyruk dikmesi, kanat ucu): pts [[z, y], …], kalınlık x
+  const fin = (pts, thick, bevel = 0.06) => {
+    const sh = new THREE.Shape(pts.map(([z, y]) => new THREE.Vector2(z, y)));
+    const eg = new THREE.ExtrudeGeometry(sh, { depth: thick, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2 });
+    eg.translate(0, 0, -thick / 2); eg.rotateY(-Math.PI / 2);   // şekil x → z, kalınlık x
+    eg.computeVertexNormals();
+    return eg;
+  };
   const navMat = (c) => new THREE.MeshBasicMaterial({ color: c, toneMapped: false });
-  add(new THREE.SphereGeometry(0.18, 8, 6), navMat('#ff3030'), 13.9, FUSE_Y - 0.2, -5.4);
-  add(new THREE.SphereGeometry(0.18, 8, 6), navMat('#30ff60'), -13.9, FUSE_Y - 0.2, -5.4);
-  add(new THREE.SphereGeometry(0.2, 8, 6), navMat('#ffffff'), 0, FUSE_Y + 6.2, -16.4);
+  const DIH = 0.085;   // kanat yukarı açısı
+  for (const s of [-1, 1]) {
+    const wgp = new THREE.Group(); wgp.position.set(s * 1.0, FUSE_Y - 0.95, 0); wgp.rotation.z = s * DIH; g.add(wgp);
+    const wing = new THREE.Mesh(slab([[0, 2.4], [14.2, -5.6], [14.2, -7.2], [0, -3.6]], 0.26, s), white);
+    wing.castShadow = wing.receiveShadow = true; wgp.add(wing);
+    // kanat altı flap rayları (küçük kılıflar)
+    for (const fx of [4.2, 7.6, 10.6]) {
+      const fr = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.3, 1.6), bodyMat.clone()); fr.material.color.set('#d8dbe2'); fr.material.vertexColors = false;
+      fr.position.set(s * fx, -0.25, -2.9 - fx * 0.55); wgp.add(fr);
+    }
+    // kanat ucu (winglet): camgöbeği, yukarı + hafif dışa
+    const wl = new THREE.Mesh(fin([[-5.5, 0], [-7.2, 0], [-8.2, 1.9], [-7.15, 1.9]], 0.12), teal);
+    wl.position.set(s * 14.25, 0.05, 0); wl.rotation.z = -s * 0.12; wl.castShadow = true; wgp.add(wl);
+    const nav = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), navMat(s > 0 ? '#ff3030' : '#30ff60'));
+    nav.position.set(s * 14.3, 0.1, -5.6); wgp.add(nav);
+    // motor: dönel kaporta (ağız dudağı, gövde, egzoz konisi) + direk; fan ağızda döner
+    const nac = [[0.32, 0], [0.55, 0.25], [0.6, 0.6], [0.78, 1.0], [0.88, 2.2], [0.9, 3.4], [0.84, 4.15], [0.74, 4.4], [0.7, 4.3]].map(([r, y]) => new THREE.Vector2(r, y));
+    const ng = new THREE.LatheGeometry(nac, 28); ng.rotateX(Math.PI / 2); ng.computeVertexNormals();
+    const eng = new THREE.Group(); eng.position.set(s * 5.0, -1.05, -1.35); wgp.add(eng);
+    const nm = new THREE.Mesh(ng, new THREE.MeshStandardMaterial({ color: '#eef0f3', roughness: 0.3, metalness: 0.35, side: THREE.DoubleSide }));
+    nm.castShadow = true; eng.add(nm);
+    const lip = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.06, 8, 28), grey); lip.position.z = 4.38; eng.add(lip);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.905, 0.905, 0.35, 28, 1, true), new THREE.MeshStandardMaterial({ color: '#d4232c', roughness: 0.5, side: THREE.DoubleSide }));
+    band.rotation.x = Math.PI / 2; band.position.z = 3.3; eng.add(band);
+    const inner = new THREE.Mesh(new THREE.CircleGeometry(0.7, 24), dark); inner.position.z = 3.6; eng.add(inner);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.7, 16), grey); cone.rotation.x = -Math.PI / 2; cone.position.z = -0.2; eng.add(cone);
+    const pylon = new THREE.Mesh(slab([[-0.12, 3.2], [0.12, 3.2], [0.12, 0.2], [-0.12, -0.6]], 0.55, 1, 0.04), white);
+    pylon.position.set(s * 5.0, -0.45, -1.35); wgp.add(pylon);
+    // fan: göbek + 18 kanat (kalkışta hızlanır, inince yavaşlayıp durur)
+    const fan = new THREE.Group(); fan.position.set(0, 0, 3.75); eng.add(fan);
+    const hub = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.45, 14), new THREE.MeshStandardMaterial({ color: '#d0d4da', metalness: 0.6, roughness: 0.3 }));
+    hub.rotation.x = Math.PI / 2; hub.position.z = 0.15; fan.add(hub);
+    const bladeG = new THREE.BoxGeometry(0.1, 0.5, 0.03);
+    for (let k = 0; k < 18; k++) {
+      const a = k * Math.PI * 2 / 18, b = new THREE.Mesh(bladeG, grey);
+      b.position.set(Math.sin(a) * 0.42, Math.cos(a) * 0.42, 0); b.rotation.z = -a; b.rotation.y = 0.55; fan.add(b);
+    }
+    (g.userData.fans = g.userData.fans || []).push(fan);
+    // yatay dengeleyiciler (kuyrukta)
+    const hs = new THREE.Mesh(slab([[0, -12.6], [5.9, -15.9], [5.9, -17.1], [0, -16.1]], 0.16, s, 0.05), white);
+    hs.position.set(s * 0.4, FUSE_Y + 0.95, 0); hs.rotation.z = s * 0.1; hs.castShadow = true; g.add(hs);
+  }
+  // dikey kuyruk: camgöbeği, pembe çapraz bant, kökte gövdeye gömülü
+  const tailY = FUSE_Y + 0.9;
+  add(fin([[-10.6, 0], [-15.1, 6.3], [-17.2, 6.3], [-17.6, 0]], 0.34), teal, 0, tailY, 0);
+  add(fin([[-12.1, 2.0], [-13.0, 3.3], [-16.95, 3.3], [-17.15, 2.0]], 0.37, 0.03), pink, 0, tailY, 0);
+  add(fin([[-14.0, 4.7], [-14.45, 5.35], [-17.1, 5.35], [-17.2, 4.7]], 0.37, 0.03), new THREE.MeshStandardMaterial({ color: '#f6f4f0', roughness: 0.5 }), 0, tailY, 0);
+  add(new THREE.SphereGeometry(0.2, 8, 6), navMat('#ffffff'), 0, tailY + 6.45, -16.9);
+  add(new THREE.SphereGeometry(0.16, 8, 6), navMat('#ff2020'), 0, FUSE_Y + FUSE_R + 0.12, 2);   // tepe çakar
+  // iniş takımı: burun (çift teker) + ana (dört teker, iki yanda)
+  const wheel = new THREE.CylinderGeometry(0.55, 0.55, 0.36, 18), hubG = new THREE.CylinderGeometry(0.28, 0.28, 0.38, 12);
+  const hubM = new THREE.MeshStandardMaterial({ color: '#c8ccd2', metalness: 0.6, roughness: 0.35 });
+  const wheelAt = (x, z, r = 0.55) => { add(wheel, tire, x, r, z, 0, 0, Math.PI / 2); add(hubG, hubM, x, r, z, 0, 0, Math.PI / 2); };
+  add(new THREE.CylinderGeometry(0.11, 0.11, FUSE_Y - 1.4, 8), grey, 0, (FUSE_Y - 1.4) / 2 + 0.55, 9.5);
+  for (const dx of [-0.24, 0.24]) wheelAt(dx, 9.5);
+  for (const s of [-1, 1]) {
+    add(new THREE.CylinderGeometry(0.17, 0.17, FUSE_Y - 1.5, 8), grey, s * 2.4, (FUSE_Y - 1.5) / 2 + 0.55, -1.25);
+    add(new THREE.BoxGeometry(0.2, 0.2, 1.3), grey, s * 2.4, 0.55, -1.25);
+    for (const dx of [-0.24, 0.24]) for (const z of [-0.85, -1.65]) wheelAt(s * 2.4 + dx, z);
+  }
   // merdiven (kapıdan yere, +x yönünde)
   const stairs = new THREE.Group();
   const steps = 9, sillY = FUSE_Y - 1.1, run = 3.6;

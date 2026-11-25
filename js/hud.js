@@ -16,7 +16,7 @@ export class HUD {
     this.el = {
       stars: $('stars'), money: $('money'), hp: $('hpfill'), clock: $('clock'), speedo: $('speedo'), speed: $('speed'),
       veh: $('vehname'), radio: $('radioname'), objective: $('objective'), notify: $('notify'), big: $('big'),
-      bigT: $('bigtitle'), bigS: $('bigsub'), prompt: $('prompt'), card: $('missioncard'), timer: $('mtimer'),
+      bigT: $('bigtitle'), bigS: $('bigsub'), bigN: $('bignote'), prompt: $('prompt'), card: $('missioncard'), timer: $('mtimer'),
       radioPop: $('radiopop'), mapWrap: $('bigmap'),
       mreward: $('mreward'), mrMoney: $('mrmoney'), mrTime: $('mrtime'),
     };
@@ -111,9 +111,11 @@ export class HUD {
     setTimeout(() => n.remove(), dur * 1000 + 600);
   }
   hint(text, dur = 0.3) { this.hintText = text; this.hintT = dur; this.textT = 0; }
-  big(title, sub = '', color = '#fff', dur = 3.5) {
+  big(title, sub = '', color = '#fff', dur = 3.5, note = '') {
     const e = this.el;
     e.bigT.textContent = title; e.bigS.textContent = sub; e.bigT.style.color = color;
+    e.bigN.textContent = note; e.bigN.style.display = note ? 'block' : 'none';
+    e.big.style.animationDuration = Math.max(3.4, dur) + 's';   // uzun gösterim (ör. not satırı okunsun)
     e.big.classList.remove('show'); void e.big.offsetWidth; e.big.classList.add('show');
     clearTimeout(this._bigTO); this._bigTO = setTimeout(() => e.big.classList.remove('show'), dur * 1000);
   }

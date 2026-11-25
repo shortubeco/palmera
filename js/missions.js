@@ -155,6 +155,12 @@ export class Missions {
   }
   start(m) {
     const g = this.game;
+    // (saat görevde değişmez: oyun açılışında rastgele seçilir — env.js randomStartHour)
+    // hava da her görevde değişir: güneşli %40, bulutlu %30, yağmurlu %30 (art arda aynısı gelmez)
+    const WX = ['sun', 'sun', 'cloudy', 'cloudy', 'rain', 'rain', 'sun', 'cloudy', 'rain', 'sun'];
+    let w; do { w = WX[Math.floor(Math.random() * WX.length)]; } while (w === this.lastWeather);
+    this.lastWeather = w;
+    g.env.setWeather(w);
     g.hud.mission(m.name + ' Görevi', m.intro);
     g.hud.big(m.name.toUpperCase(), 'Görev başladı', m.color, 2.5);
     g.audio?.jingle('start');
@@ -178,7 +184,7 @@ export class Missions {
     g.hud.objective('');
     if (success) {
       // ödülü sunucu hesaplar (lig: başlangıç ödülü − kesinti × süre; yardım: sabit)
-      g.hud.big('GÖREV TAMAMLANDI', 'kaydediliyor…', '#ffe14d', 2);
+      // büyük yazı tek kez: sunucu yanıtı gelince (ödül + süre ile); eskiden önce "kaydediliyor…" da çıkıyordu → iki kez görünüyordu
       g.audio?.jingle('win');
       g.league.finishMission(a.m.kind, run.t * 1000).then((r) => {
         if (r.error) { g.hud.big('GÖREV TAMAMLANDI', r.error, '#ff4f6d'); return; }
@@ -187,7 +193,8 @@ export class Missions {
         const sub = a.m.kind === 'league'
           ? `+${formatMoney(r.reward)} · süre ${fmtTime(r.timeMs)}${r.newBest ? ' · YENİ REKOR!' : ''}`
           : `+${formatMoney(r.reward)}`;
-        g.hud.big('GÖREV TAMAMLANDI', sub, '#ffe14d', 4);
+        // lig atlanmadıysa: tekrar oynamaya teşvik (kullanıcı metni)
+        g.hud.big('GÖREV TAMAMLANDI', sub, '#ffe14d', r.levelUp ? 4 : 7, r.levelUp ? '' : 'Oyunun başına dön ve görevi tekrarlayıp daha çok para kazan (ESC\'ye bas).');
         if (r.levelUp) setTimeout(() => g.onLevelUp(r.levelUp), 3000);
       });
     } else {
