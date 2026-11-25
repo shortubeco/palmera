@@ -11,3 +11,7 @@
 
 # Dönüştürücü bağımlılıkları
 node_modules/
+
+# Veritabani disa aktarimi (oyuncu verisi, sifre �zetleri) � git'e girmez
+/*.sql
+

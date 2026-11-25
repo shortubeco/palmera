@@ -193,7 +193,25 @@ Kurallar **`öneriler.md`**'de (kullanıcıyla kararlaştırıldı). Özet: 7 li
 - **Test notu**: oyun artık `oyun.php?debug=1&mute=1&autostart=1&q=low` (giriş gerekir; scratchpad `pt/lig.mjs`, `pt/lig2.mjs` örnek) ya da `oyun.php?nosave=1&...` (çevrimdışı, giriş yok). Test hesaplarını sonra sil (`DELETE FROM players WHERE username LIKE 'test_%'`).
 - **Doğrulanmadı**: gerçek tarayıcıda oynanış, telefon görünümü, hostingte PostgreSQL bağlantısı.
 
-## KALDIĞIMIZ YER (2026-11-24 akşam) — buradan devam
+## KALDIĞIMIZ YER (2026-11-25 akşam) — buradan devam
+**Yarın yapılacaklar (kullanıcı istedi):**
+1. **Ana sayfadaki 3 ekran görüntüsü güncellenecek** (`img/palmera.jpg`, `wildwest.jpg`, `casablanca.jpg`; 960×540 JPG). Şimdikiler çizgi film görünümünden, beyaz arabadan, sarı kumdan, Casablanca renklerinden ÖNCE çekildi. Çekim: scratchpad `pt/shot.mjs` + yardımcı `snap(px,py,pz,lx,ly,lz)` (g.paused = true yapmalı, yoksa oyun döngüsü kamerayı ezer), `hideMk()` görev işaretlerini gizler.
+2. **Mobil uygulama** için konuşulacak — kullanıcı fikir almak istiyor (kod yazma, önce tartış).
+
+**Bugün yapılanlar (2026-11-25)** — hepsi git'te, GitHub'a gönderildi:
+- **Git**: yerel depo + `origin` = https://github.com/shortubeco/palmera (ÖZEL depo, `main`). `.gitignore`: ham `assets/*` (yalnız `assets/web/` girer), `config.local.php`, `yayin/`, `yayin.zip`, `node_modules/`, `*.sql`. Kullanıcı "yedekle" deyince commit, "github'a yükle" deyince push. assets/web dönüştürülmüş lisanslı modeller içerir → depo herkese açılırsa çıkarılmalı.
+- **Ad: Palmera City** (eski "Palmera Nights"/"Palmera Bay" her yerde değişti; .md'ler hariç).
+- **Çizgi film görünümü 1. adım** (`?toon=0` kapatır, localStorage `pn_toon`): main.js `TOON_GRADE` son renk geçişi (doygunluk/karşıtlık/ayrık ton), env.js gökyüzü `uToon` (bantlı gradyan, büyük güneş diski, iki tonlu keskin bulutlar), sis ×0,7. Sıradaki olası adımlar: basamaklı ışık (toon shading), konturlar (yalnız orta/yüksek).
+- Palmera kumu altın sarısı (`textures.js sandTexture`), palmiye gövdeleri kahverengi (`palmModel`).
+- **Casablanca renkleri** (`casablanca.js` WALL_GLSL, köşe rengine göre): sur/kale/liman açık kahverengi; evler (HOUSE_RE) kopya konumuna göre beyaz / hardal-kahve / açık kahverengi; zemin açık kum sarısı; sis `fogScale` 0,4.
+- **Ana sayfa**: sıralamalar alt alta (sekme yok), metinler kullanıcının yazdığı gibi, OYNA altında 3 ekran görüntüsü, footer, mobil taşma düzeltildi.
+- **Oyun**: başlangıç spor arabası beyaz; "Hoş geldin" penceresi (`#intro`, imleç serbest, ✕/BAŞLA/Enter → fare kilidi; Tahta için yol tarifi); araç istemi "F: Arabaya bin" (motor/tekne/at/at arabası ayrı); görev penceresi yeni metin + okunaklı font + "… Görevi" başlığı; "GÖREV TAMAMLANDI" tek kez + alt not "Oyunun başına dön … (ESC'ye bas)"; sağ üstte "Saat:" (hava simgesi kalktı).
+- **Saat**: oyun açılışında / başa dönüşte rastgele (`env.randomStartHour`); **yeni üye** (hiç görev denemesi yok, `playerState.played`) 15:00'te başlar. **Hava** her görev başında değişir (`env.setWeather` sun/cloudy/rain) — kullanıcıya "hava da oyun başına taşınsın mı?" soruldu, cevap yok.
+- **Uçak yeniden tasarlandı** (flight.js `buildPlane`): dönel gövde + kırmızı/mavi şerit, tek tek pencereler, kokpit camı, ok açılı kanat + winglet, dönel motorlar, kuyrukta beyaz çember içinde beyaz P logosu. Merdiven/kapı/çarpışma eskisi gibi.
+- **Hosting çalışıyor** (http://oyungta.trthabercanli.com, PHP 8.2, PostgreSQL 10.23): `yayin.zip` yüklendi, `config.local.php` hostingte elle (db `sozcpdjd_palmera`, kullanıcı `sozcpdjd_palmeraadm`). Yerel db `palmera_db.sql` olarak dışa aktarılıp içe aktarıldı (PG18'e özgü SET satırları ve `AS integer` temizlendi). Tablolar başka kullanıcıyla oluştuğu için `GRANT ALL ON ALL TABLES/SEQUENCES IN SCHEMA public TO sozcpdjd_palmeraadm` gerekti. Oyun kodu PG ≥ 9.5 ister (ON CONFLICT).
+- **Hatırlatılacak**: hostingten `dbtest.php` (geçici test) ve kökteki `yayin.zip` silinmeli; yerel `palmera_db.sql` (oyuncu verisi) artık gereksiz. `.gitignore`'daki `*.sql` satırı henüz commit edilmedi.
+
+## (Önceki) KALDIĞIMIZ YER (2026-11-24 akşam)
 - Lig sistemi Tahta ligiyle çalışıyor (yukarı bak). **Sıradaki**: kullanıcı Demir → Elmas liglerinin görevlerini anlatacak (her lig için `LEAGUES[n].mission` + `missions.js`'e görev sınıfı; botların sürelerini yeniden üret).
 - Hostinge geçiş: hostingte `config.local.php` (hosting PostgreSQL bilgileri) oluşturulmalı; tablolar + botlar ilk açılışta kurulur. Kullanıcı isterse `yayin.zip` üretilecek.
 - Kullanıcıdan yorum bekleyen: ana sayfa görünümü, oyunda lig akışı.
