@@ -123,10 +123,10 @@ export function sandTexture() {
   const rnd = mulberry32(5);
   const S = 512;
   const [c, g] = canvas(S, S);
-  g.fillStyle = '#e9d2a6'; g.fillRect(0, 0, S, S);
+  g.fillStyle = '#f3d27a'; g.fillRect(0, 0, S, S);   // sıcak altın sarısı kum (kullanıcı: daha sarı)
   noise(g, S, S, 50000, rnd, 0.09);
   for (let i = 0; i < 40; i++) {
-    g.strokeStyle = 'rgba(180,150,100,0.12)'; g.lineWidth = 2;
+    g.strokeStyle = 'rgba(196,146,62,0.14)'; g.lineWidth = 2;
     g.beginPath();
     const y = rnd() * S; g.moveTo(0, y);
     g.bezierCurveTo(S * 0.3, y + 10, S * 0.6, y - 10, S, y);

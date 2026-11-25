@@ -1482,11 +1482,14 @@ export function palmModel(rnd, timeUniform) {
   trunk.translate(0, 4.5, 0);
   const tp = trunk.attributes.position;
   const tcol = new Float32Array(tp.count * 3);
+  // gövde: sıcak kahverengi (ceviz), halkalar biraz koyu; tepeye doğru hafif açılır
+  const bark = new THREE.Color('#7b5130'), barkTop = new THREE.Color('#9a6a3e'), tc = new THREE.Color();
   for (let i = 0; i < tp.count; i++) {
     const y = tp.getY(i);
     tp.setX(i, tp.getX(i) + 0.03 * y * y);
-    const ring = (Math.floor(y * 2.2) % 2) ? 0.82 : 1;
-    tcol[i * 3] = 0.55 * ring; tcol[i * 3 + 1] = 0.42 * ring; tcol[i * 3 + 2] = 0.3 * ring;
+    const ring = (Math.floor(y * 2.2) % 2) ? 0.72 : 1;
+    tc.copy(bark).lerp(barkTop, y / 9).multiplyScalar(ring);
+    tcol[i * 3] = tc.r; tcol[i * 3 + 1] = tc.g; tcol[i * 3 + 2] = tc.b;
   }
   trunk.setAttribute('color', new THREE.BufferAttribute(tcol, 3));
   trunk.computeVertexNormals();
