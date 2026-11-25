@@ -1,0 +1,2 @@
+# server/ yalnız PHP'den require edilir; tarayıcıdan açılmasın
+Require all denied

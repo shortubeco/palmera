@@ -1,0 +1,13 @@
+# Ham model/doku paketleri (büyük, lisanslı) — oyun yalnız assets/web/ kullanır
+/assets/*
+!/assets/web/
+
+# Veritabanı şifresi — yerelde kalır
+/config.local.php
+
+# Yayın çıktısı (tools/yayin.ps1 üretir)
+/yayin/
+/yayin.zip
+
+# Dönüştürücü bağımlılıkları
+node_modules/

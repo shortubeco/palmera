@@ -1,0 +1,198 @@
+:root {
+  --pink: #ff3fa4; --cyan: #29e7ff; --purple: #8a3cff; --gold: #ffd93d;
+  --ink: #0d0618; --hud: rgba(10, 6, 22, 0.55);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0618; color: #fff; font-family: "Segoe UI", Arial, sans-serif; user-select: none; }
+#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.hidden { display: none !important; }
+
+/* ---------- yükleme ekranı ---------- */
+#loading {
+  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  background: linear-gradient(180deg, #14062e 0%, #4a1460 55%, #ff4f9a 100%); transition: opacity 0.6s;
+}
+#loading.done { opacity: 0; pointer-events: none; }
+.ld-logo { font: italic 900 64px Impact, "Arial Black", sans-serif; color: #bff4ff; letter-spacing: 4px; text-shadow: 0 4px 0 #ff3fa4; transform: rotate(-3deg); }
+.ld-logo span { font: 400 64px "Brush Script MT", "Segoe Script", cursive; color: #ff3fa4; text-shadow: 0 0 18px #ff3fa4; letter-spacing: 0; }
+.ld-text { font: italic 900 34px Impact, "Arial Black", sans-serif; letter-spacing: 3px; color: #fff; text-shadow: 0 3px 0 #000; }
+.ld-dots i { font-style: normal; animation: ld-blink 1.2s infinite; opacity: 0.2; }
+.ld-dots i:nth-child(2) { animation-delay: 0.2s; } .ld-dots i:nth-child(3) { animation-delay: 0.4s; }
+.ld-bar { width: 260px; height: 6px; border-radius: 3px; background: rgba(0, 0, 0, 0.35); overflow: hidden; }
+.ld-bar div, .rg-bar div { width: 0; height: 100%; background: linear-gradient(90deg, #29e7ff, #ff3fa4); transition: width 0.25s linear, background 0.2s; }
+.ld-bar div.full, .rg-bar div.full { background: #3be37a; box-shadow: 0 0 10px #3be37a; }
+.rg-bar { width: 220px; height: 6px; margin: 10px auto 0; border-radius: 3px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
+.ld-sub { font: 15px Georgia, serif; color: #ffd1ec; }
+@keyframes ld-blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+@keyframes ld-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+
+/* ---------- başlık ekranı ---------- */
+#title {
+  position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+  background: linear-gradient(180deg, rgba(20, 6, 48, 0.82) 0%, rgba(90, 20, 110, 0.45) 45%, rgba(255, 80, 150, 0.25) 70%, rgba(13, 6, 24, 0.85) 100%);
+  z-index: 20;
+}
+#title .sun {
+  position: absolute; width: 360px; height: 360px; border-radius: 50%; top: 9%;
+  background: repeating-linear-gradient(180deg, #ffe36e 0 18px, #ff7aa8 18px 22px, transparent 22px 26px), linear-gradient(#ffe36e, #ff3fa4);
+  opacity: 0.22; filter: blur(1px);
+  mask-image: linear-gradient(180deg, #000 40%, transparent 95%);
+}
+.logo { text-align: center; position: relative; transform: rotate(-4deg); }
+.logo-top {
+  font: italic 900 108px/0.9 Impact, "Arial Black", sans-serif; letter-spacing: 6px;
+  background: linear-gradient(180deg, #e8fbff 0%, #8fe9ff 45%, #2a6fd8 52%, #b7f2ff 75%, #ffffff 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  -webkit-text-stroke: 2px #1b0f3a; filter: drop-shadow(0 6px 0 #ff3fa4) drop-shadow(0 0 30px rgba(41, 231, 255, 0.5));
+}
+.logo-bottom {
+  font: 400 104px/1 "Brush Script MT", "Segoe Script", cursive; color: #ff3fa4; margin-top: -26px; margin-left: 180px;
+  text-shadow: 0 0 8px #ff3fa4, 0 0 26px #ff3fa4, 0 0 60px #ff00aa;
+}
+.logo-sub { margin-top: 8px; font: 600 15px Georgia, serif; letter-spacing: 4px; color: #ffd1ec; text-transform: uppercase; }
+.menu { display: flex; gap: 18px; align-items: center; position: relative; flex-wrap: wrap; justify-content: center; }
+.menu button, .pbox button {
+  font: italic 900 30px Impact, "Arial Black", sans-serif; letter-spacing: 3px; padding: 12px 44px; cursor: pointer;
+  color: #1b0f3a; background: linear-gradient(90deg, #29e7ff, #ff3fa4); border: 0; border-radius: 4px;
+  box-shadow: 0 0 24px rgba(255, 63, 164, 0.6); transition: transform 0.1s;
+}
+.menu button:hover, .pbox button:hover { transform: scale(1.05); }
+.menu label { font-weight: 600; color: #ffd1ec; display: flex; gap: 8px; align-items: center; }
+.menu select { background: #1b0f3a; color: #fff; border: 1px solid #ff3fa4; padding: 6px 8px; border-radius: 4px; font-size: 14px; }
+.controls {
+  position: relative; display: grid; grid-template-columns: repeat(3, auto); gap: 6px 26px; font-size: 14px; color: #e9dcff;
+  background: rgba(13, 6, 24, 0.55); padding: 14px 22px; border: 1px solid rgba(255, 63, 164, 0.35); border-radius: 6px;
+}
+.controls b { color: var(--cyan); }
+.ttips { position: relative; max-width: 640px; text-align: center; font: 14px/1.5 Arial, sans-serif; color: #ffd1ec; text-shadow: 0 1px 0 #000; }
+
+/* ---------- HUD ---------- */
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+#topright { position: absolute; top: 18px; right: 26px; text-align: right; }
+/* sağ üst: oyuncunun ligi (eski kalplerin yeri) */
+#leaguebadge { line-height: 1.1; margin-bottom: 4px; }
+#leaguebadge b { display: block; font: italic 900 24px Impact, "Arial Black", sans-serif; letter-spacing: 2px; color: #ffd23f; text-shadow: 0 2px 0 #000, 0 0 12px rgba(255, 210, 63, 0.5); }
+#leaguebadge small { font: 700 14px Arial, sans-serif; color: #fff; text-shadow: 0 1px 0 #000; }
+#stars small { font: italic 900 16px Impact, "Arial Black", sans-serif; letter-spacing: 2px; color: #ffe36e; text-shadow: 0 2px 0 #000; vertical-align: middle; margin-right: 8px; }
+/* görev sırasında: azalan lig ödülü + geçen süre (üst orta) */
+#mreward { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); text-align: center; display: none; text-shadow: 0 3px 0 #000; }
+#mrmoney { font: italic 900 46px Impact, "Arial Black", sans-serif; color: #7dff8a; -webkit-text-stroke: 1.5px #0b2a12; }
+#mrmoney.low { color: #ff4f6d; -webkit-text-stroke-color: #3a0812; animation: pulse 0.5s infinite alternate; }
+#mrtime { font: 700 22px Arial, sans-serif; color: #fff; }
+/* ESC: oyuncunun kendi sıralaması */
+#prank { min-width: 380px; padding: 12px 18px; background: rgba(12, 8, 30, 0.85); border: 2px solid rgba(255, 210, 63, 0.7); border-radius: 8px; text-align: left; }
+#prank:empty { display: none; }
+.pr-head { font: 700 17px Arial, sans-serif; color: #fff; margin-bottom: 8px; }
+.pr-head b { color: #ffd23f; }
+.pr-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 18px; font: 15px Arial, sans-serif; color: #d9c9f0; }
+.pr-grid b { color: #fff; }
+#prank i { font-style: normal; color: #b9a8d8; font-weight: 400; }
+.pr-note { margin-top: 8px; font: 14px Arial, sans-serif; color: #ffd23f; }
+.pbox p a, .tplayer a { color: var(--cyan); }
+.tplayer { position: relative; font: 600 15px Arial, sans-serif; color: #fff; text-shadow: 0 1px 0 #000; }
+#stars { font-size: 34px; letter-spacing: 2px; line-height: 1; }
+#stars span { color: rgba(255, 255, 255, 0.18); -webkit-text-stroke: 1px rgba(0, 0, 0, 0.6); }
+#stars span.on { color: #fff; text-shadow: 0 0 10px #ffe36e, 0 2px 0 #000; }
+#stars span.dim { color: rgba(255, 255, 255, 0.45); }
+#money {
+  font: italic 900 38px Impact, "Arial Black", sans-serif; color: #7dff8a; letter-spacing: 1px;
+  -webkit-text-stroke: 1.5px #0b2a12; text-shadow: 0 3px 0 #000;
+}
+#clockrow { font: 700 20px Arial, sans-serif; color: #fff; text-shadow: 0 2px 0 #000; }
+#mapwrap { position: absolute; left: 24px; bottom: 22px; width: 220px; }
+#minimap { width: 220px; height: 220px; border-radius: 50%; border: 4px solid rgba(20, 10, 40, 0.85); box-shadow: 0 0 0 2px rgba(255, 63, 164, 0.6), 0 6px 20px rgba(0, 0, 0, 0.5); display: block; }
+#hpbar { margin: 10px auto 0; width: 180px; height: 10px; background: rgba(0, 0, 0, 0.6); border: 2px solid rgba(0, 0, 0, 0.7); border-radius: 3px; overflow: hidden; }
+#hpfill { height: 100%; width: 100%; background: #4cff7a; transition: width 0.2s; }
+#speedo {
+  position: absolute; right: 30px; bottom: 26px; text-align: right; display: none;
+  font: italic 900 52px Impact, "Arial Black", sans-serif; color: #fff; text-shadow: 0 3px 0 #000, 0 0 16px rgba(41, 231, 255, 0.6);
+}
+#speedo small { font-size: 20px; color: var(--cyan); }
+#vehname { font: 700 16px Arial, sans-serif; color: #ffd1ec; text-shadow: 0 2px 0 #000; }
+#radioname { font: italic 700 15px Georgia, serif; color: var(--cyan); text-shadow: 0 2px 0 #000; }
+#objective {
+  position: absolute; bottom: 92px; left: 50%; transform: translateX(-50%); max-width: 70vw; display: none;
+  font: 600 20px Arial, sans-serif; text-align: center; padding: 8px 18px; background: var(--hud); border-radius: 4px;
+  text-shadow: 0 2px 0 #000; border-left: 4px solid var(--gold);
+}
+#mtimer { position: absolute; top: 120px; right: 28px; font: italic 900 40px Impact, sans-serif; color: #fff; text-shadow: 0 3px 0 #000; display: none; }
+#mtimer.urgent { color: #ff4f6d; animation: pulse 0.5s infinite alternate; }
+/* sol üstte kalıcı iki satır: M harita, ESC menü */
+/* kalplerle (sağ üst, top 18px, 44px satır) aynı hizada; ESC menüsündeki tuş listesiyle aynı görünüm: tuş kalın turkuaz, yazı beyaz */
+#keyhelp { position: absolute; top: 20px; left: 26px; font: 15px/20px Arial, sans-serif; color: #fff; text-shadow: 0 1px 0 #000; }
+#keyhelp b { color: var(--cyan); }
+#prompt { position: absolute; top: 76px; left: 24px; max-width: 420px; padding: 10px 14px; background: var(--hud); border-left: 4px solid var(--cyan); font: 600 16px Arial, sans-serif; display: none; }
+#notify { position: absolute; top: 150px; left: 24px; display: flex; flex-direction: column; gap: 8px; max-width: 420px; }
+.toast { padding: 9px 14px; background: var(--hud); border-left: 4px solid var(--pink); font: 600 15px Arial, sans-serif; animation: slidein 0.3s ease-out; transition: opacity 0.5s, transform 0.5s; }
+.toast.out { opacity: 0; transform: translateX(-30px); }
+#radiopop { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); font: italic 900 28px Georgia, serif; color: #fff; text-shadow: 0 0 12px var(--pink), 0 2px 0 #000; opacity: 0; }
+#radiopop.show { animation: pop 2.2s ease-out forwards; }
+#missioncard {
+  position: absolute; left: 50%; top: 18%; transform: translateX(-50%); width: min(620px, 80vw); padding: 18px 22px;
+  background: linear-gradient(90deg, rgba(27, 15, 58, 0.92), rgba(80, 20, 90, 0.85)); border: 2px solid var(--pink); border-radius: 6px;
+  opacity: 0; transition: opacity 0.4s;
+}
+#missioncard.show { opacity: 1; }
+.mc-title { font: italic 900 34px Impact, sans-serif; color: var(--gold); letter-spacing: 2px; text-shadow: 0 3px 0 #000; }
+.mc-text { margin-top: 6px; font: 17px/1.45 Georgia, serif; color: #f4e9ff; }
+#big { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; }
+#big.show { animation: bigin 3.4s ease-out forwards; }
+#bigtitle { font: italic 900 92px Impact, "Arial Black", sans-serif; letter-spacing: 6px; -webkit-text-stroke: 3px #000; text-shadow: 0 6px 0 #000; }
+#bigsub { font: 700 24px Arial, sans-serif; text-shadow: 0 2px 0 #000; }
+#lockhint { position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%); padding: 8px 14px; background: rgba(0, 0, 0, 0.5); border-radius: 4px; font-size: 14px; }
+#hurt { position: fixed; inset: 0; pointer-events: none; z-index: 9; }
+#hurt.flash { animation: hurt 0.5s ease-out; }
+
+#bigmap { position: fixed; inset: 0; z-index: 15; background: rgba(5, 3, 12, 0.92); }
+#bigmapcanvas { width: 100%; height: 100%; display: block; }
+.maphelp { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); font: italic 900 24px Impact, sans-serif; color: var(--pink); text-shadow: 0 2px 0 #000; }
+
+#pause { position: fixed; inset: 0; z-index: 30; background: rgba(13, 6, 24, 0.75); display: flex; overflow-y: auto; pointer-events: auto; }
+/* margin:auto: sığarsa ortada, sığmazsa kaydırılabilir (üstü kesilmez) */
+.pbox { margin: auto; padding: 14px 0; text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.pbox h2 { font: italic 900 48px Impact, sans-serif; margin: 0; color: var(--cyan); text-shadow: 0 0 20px var(--cyan); }
+.pbox button { font-size: 24px; padding: 8px 36px; }
+.pbox p { margin: 0; }
+.pbox p { color: #d9c9f0; max-width: 360px; }
+.pcontrols { text-align: left; margin-top: 6px; }
+.pcontrols .ph { font: italic 900 18px Impact, sans-serif; color: var(--pink); letter-spacing: 1px; border-bottom: 1px solid rgba(255, 63, 164, 0.35); padding-bottom: 2px; }
+#over { position: fixed; inset: 0; z-index: 30; background: rgba(13, 6, 24, 0.72); display: flex; align-items: center; justify-content: center; }
+.obox { text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.obox h2 { font: italic 900 80px Impact, "Arial Black", sans-serif; margin: 0; letter-spacing: 4px; -webkit-text-stroke: 3px #000; text-shadow: 0 6px 0 #000; }
+.obox p { margin: 0 0 6px; max-width: min(680px, 90vw); color: #f4e9ff; font: 18px/1.45 Georgia, serif; }
+#overBtns { display: flex; flex-direction: column; gap: 10px; min-width: 380px; }
+#overBtns button {
+  font: italic 900 24px Impact, "Arial Black", sans-serif; letter-spacing: 1px; padding: 12px 24px; cursor: pointer; text-align: left;
+  color: #1b0f3a; background: linear-gradient(90deg, #29e7ff, #ff3fa4); border: 0; border-radius: 4px; box-shadow: 0 0 20px rgba(255, 63, 164, 0.5);
+}
+#overBtns button:hover { transform: scale(1.03); }
+/* başlık: başka şehirde kalındıysa ikinci düğme (oyunun başından, Palmera'dan) */
+.menu #playhome { font-size: 20px; padding: 10px 26px; background: linear-gradient(90deg, #ffd23f, #ff7ac0); }
+/* havaalanı bilet menüsü */
+#flightmenu { position: fixed; inset: 0; z-index: 40; background: rgba(13, 6, 24, 0.6); display: flex; align-items: center; justify-content: center; }
+#flightmenu .fbox { display: flex; flex-direction: column; gap: 10px; min-width: 380px; padding: 24px 30px; background: rgba(12, 8, 30, 0.92); border: 2px solid #29e7ff; border-radius: 8px; text-align: center; }
+#flightmenu h2 { margin: 0; font: italic 900 34px Impact, "Arial Black", sans-serif; color: #ffd23f; letter-spacing: 2px; }
+#flightmenu p { margin: 0; color: #f4e9ff; font: 16px Georgia, serif; }
+#flightmenu .ohelp { font: 13px Arial, sans-serif; color: #c9b8e8; }
+#flightmenu button {
+  font: italic 900 22px Impact, "Arial Black", sans-serif; letter-spacing: 1px; padding: 10px 20px; cursor: pointer; text-align: left;
+  color: #1b0f3a; background: linear-gradient(90deg, #29e7ff, #ff3fa4); border: 0; border-radius: 4px;
+}
+#flightmenu button b { float: right; }
+#flightmenu button:last-of-type { background: #3a3550; color: #fff; text-align: center; }
+#flightmenu button:hover { transform: scale(1.03); }
+.okey { display: inline-block; width: 30px; height: 30px; line-height: 30px; margin-right: 12px; text-align: center; border-radius: 50%; background: #1b0f3a; color: #fff; font-style: normal; font-size: 18px; }
+.obox .ohelp { font: 14px Arial, sans-serif; color: #c9b8e8; }
+#fatal { position: fixed; inset: 30% 20% auto; z-index: 40; padding: 20px; background: #300; border: 2px solid #f44; font: 16px monospace; }
+
+@keyframes slidein { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: none; } }
+@keyframes pop { 0% { opacity: 0; transform: translate(-50%, -10px); } 12% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes bigin { 0% { opacity: 0; transform: scale(1.4); } 10% { opacity: 1; transform: scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes hurt { 0% { box-shadow: inset 0 0 160px rgba(255, 0, 40, 0.65); } 100% { box-shadow: inset 0 0 160px rgba(255, 0, 40, 0); } }
+@keyframes pulse { from { transform: scale(1); } to { transform: scale(1.1); } }
+
+@media (max-width: 760px) {
+  .logo-top { font-size: 64px; } .logo-bottom { font-size: 60px; margin-left: 80px; margin-top: -14px; }
+  .controls { grid-template-columns: repeat(2, auto); font-size: 12px; }
+  #minimap { width: 150px; height: 150px; } #mapwrap { width: 150px; } #hpbar { width: 130px; }
+}
