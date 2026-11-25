@@ -1,4 +1,4 @@
-/* Palmera Nights — ana sayfa (lig sıralamaları). Oyunla aynı synthwave renkleri. */
+/* Palmera City — ana sayfa (lig sıralamaları). Oyunla aynı synthwave renkleri. */
 :root { --pink: #ff3fa4; --cyan: #29e7ff; --gold: #ffd23f; --ink: #0d0618; --panel: rgba(18, 10, 40, 0.78); }
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; }

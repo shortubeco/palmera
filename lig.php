@@ -1,5 +1,5 @@
 <?php
-// Palmera Nights — lig API'si (JSON). Para ve süreyi sunucu hesaplar; tarayıcı yalnız "görev başladı / bitti" der.
+// Palmera City — lig API'si (JSON). Para ve süreyi sunucu hesaplar; tarayıcı yalnız "görev başladı / bitti" der.
 declare(strict_types=1);
 require __DIR__ . '/server/db.php';
 

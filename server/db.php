@@ -1,5 +1,5 @@
 <?php
-// Palmera Nights — lig sistemi: veritabanı bağlantısı, tablolar, lig kuralları (öneriler.md).
+// Palmera City — lig sistemi: veritabanı bağlantısı, tablolar, lig kuralları (öneriler.md).
 // Ayarlar: proje kökündeki config.local.php (yayın paketine girmez; hostingte elle oluşturulur).
 declare(strict_types=1);
 

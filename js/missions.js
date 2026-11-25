@@ -39,7 +39,7 @@ function labelSprite(m, sub) {
 // kind 'league': o ligin görevi (ödül lig kuralına göre azalır, sunucu hesaplar); 'side': yardım görevi (herkese açık, $500)
 export const MISSIONS = [
   { id: 'steal', kind: 'league', name: 'Altın Veloce', giver: 'Lola', start: { x: 192, z: -150 }, color: '#ff2fa8',
-    intro: 'Lola: "Otel Corallo\'nun müşterisi altın rengi bir Veloce GT\'yi şehir merkezine park etmiş. Arabayı çal, çizdirmeden limandaki garajıma getir."' },
+    intro: 'Altın Veloce GT\'yi çal ve limana getir. Küçük haritadaki sarı çizgiyi takip et.' },
   { id: 'escape', kind: 'side', name: 'Mavi Işıklar', giver: 'Rico', start: { x: -100, z: -31 }, color: '#2f7bff',
     intro: 'Rico: "Polis telsizini dinledim, adını biliyorlar. Üç yıldızla başla ve onları ek — saklan, ara sokaklara dal, görüş alanından çık."' },
   { id: 'delivery', kind: 'side', name: 'Sıcak Paket', giver: 'Mama Tess', start: { x: -260, z: 47 }, color: '#ffb000',
@@ -155,7 +155,7 @@ export class Missions {
   }
   start(m) {
     const g = this.game;
-    g.hud.mission(m.name, m.intro);
+    g.hud.mission(m.name + ' Görevi', m.intro);
     g.hud.big(m.name.toUpperCase(), 'Görev başladı', m.color, 2.5);
     g.audio?.jingle('start');
     const ctor = { steal: StealMission, escape: EscapeMission, delivery: DeliveryMission, boat: BoatMission }[m.id];

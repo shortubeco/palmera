@@ -1,5 +1,5 @@
 <?php
-// Palmera Nights — oyun sayfası. Giriş yapmış oyuncunun lig durumunu (sunucu, PostgreSQL) sayfaya gömer.
+// Palmera City — oyun sayfası. Giriş yapmış oyuncunun lig durumunu (sunucu, PostgreSQL) sayfaya gömer.
 // Giriş yoksa sitenin ana sayfasına (sıralamalar + giriş) gönderir. Yalnız yerelde ?nosave=1: kayıtsız test oyunu.
 declare(strict_types=1);
 require __DIR__ . '/server/db.php';
@@ -40,7 +40,7 @@ foreach (glob(__DIR__ . '/assets/web/*.{json,bin}', GLOB_BRACE) ?: [] as $f) $si
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Palmera Nights</title>
+<title>Palmera City</title>
 <link rel="stylesheet" href="css/style.css?v=<?= htmlspecialchars($version) ?>">
 <script type="importmap">
 <?= json_encode(['imports' => $imports], JSON_UNESCAPED_SLASHES) ?>
@@ -53,7 +53,7 @@ window.ASSET_SIZES = <?= json_encode((object) $sizes) ?>;</script>
 <canvas id="game"></canvas>
 <div id="hurt"></div>
 <div id="loading">
-  <div class="ld-logo">PALMERA <span>Nights</span></div>
+  <div class="ld-logo">PALMERA <span>City</span></div>
   <div class="ld-text">Yükleniyor<span class="ld-dots"><i>.</i><i>.</i><i>.</i></span></div>
   <div class="ld-bar"><div></div></div>
   <div class="ld-sub">Şehir inşa ediliyor, palmiyeler dikiliyor…</div>
@@ -63,7 +63,7 @@ window.ASSET_SIZES = <?= json_encode((object) $sizes) ?>;</script>
   <div class="sun"></div>
   <div class="logo">
     <div class="logo-top">PALMERA</div>
-    <div class="logo-bottom">Nights</div>
+    <div class="logo-bottom">City</div>
     <div class="logo-sub">Palmera City · Florida · 1986'dan beri suç</div>
   </div>
   <div class="menu">
@@ -97,7 +97,7 @@ window.ASSET_SIZES = <?= json_encode((object) $sizes) ?>;</script>
     <div id="leaguebadge"></div>
     <div id="stars"></div>
     <div id="money">$0</div>
-    <div id="clockrow"><span id="weather">☀</span> <span id="clock">18:00</span></div>
+    <div id="clockrow">Saat: <span id="clock">18:00</span></div>
   </div>
   <div id="mapwrap">
     <canvas id="minimap" width="220" height="220"></canvas>

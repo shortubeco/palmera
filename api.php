@@ -1,5 +1,5 @@
 <?php
-// Palmera Nights — ilerleme kaydı (para + tamamlanan görevler)
+// Palmera City — ilerleme kaydı (para + tamamlanan görevler)
 // GET  → kayıtlı ilerlemeyi döndürür
 // POST → {"money": int, "completed": [string]} kaydeder
 declare(strict_types=1);

@@ -17,7 +17,7 @@ export class HUD {
       stars: $('stars'), money: $('money'), hp: $('hpfill'), clock: $('clock'), speedo: $('speedo'), speed: $('speed'),
       veh: $('vehname'), radio: $('radioname'), objective: $('objective'), notify: $('notify'), big: $('big'),
       bigT: $('bigtitle'), bigS: $('bigsub'), prompt: $('prompt'), card: $('missioncard'), timer: $('mtimer'),
-      radioPop: $('radiopop'), mapWrap: $('bigmap'), weather: $('weather'),
+      radioPop: $('radiopop'), mapWrap: $('bigmap'),
       mreward: $('mreward'), mrMoney: $('mrmoney'), mrTime: $('mrtime'),
     };
     this.mini = $('minimap'); this.mctx = this.mini.getContext('2d');
@@ -144,7 +144,6 @@ export class HUD {
       e.hp.style.width = clamp(P.health, 0, 100) + '%';
       e.hp.style.background = P.health < 30 ? '#ff3b4f' : '#4cff7a';
       e.clock.textContent = g.env.timeString;
-      e.weather.textContent = g.env.rain > 0.3 ? '🌧' : g.env.night > 0.5 ? '🌙' : '☀';
       if (P.vehicle) {
         e.speedo.style.display = 'block';
         e.speed.textContent = Math.round(P.vehicle.speedKmh);

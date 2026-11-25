@@ -1,5 +1,5 @@
 <?php
-// Palmera Nights — sitenin ana sayfası: her ligin en iyi 20'si (para + süre), OYNA, giriş / kayıt.
+// Palmera City — sitenin ana sayfası: her ligin en iyi 20'si (para + süre), OYNA, giriş / kayıt.
 // Oyunun kendisi oyun.php'de.
 declare(strict_types=1);
 require __DIR__ . '/server/db.php';
@@ -26,12 +26,12 @@ function tm(int $ms): string { $s = $ms / 1000; return sprintf('%d:%04.1f', (int
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Palmera Nights — Lig sıralamaları</title>
+<title>Palmera City — Lig sıralamaları</title>
 <link rel="stylesheet" href="css/landing.css?v=<?= $css ?>">
 </head>
 <body>
 <header class="top" id="top">
-  <div class="logo"><span class="l1">PALMERA</span><span class="l2">Nights</span></div>
+  <div class="logo"><span class="l1">PALMERA</span><span class="l2">City</span></div>
   <div class="who">
     <?php if ($me): ?>
       <span><?= h($me['username']) ?> · <b><?= h(LEAGUES[$me['league']]['name']) ?> Ligi</b> · <?= money($me['money']) ?></span>
@@ -44,7 +44,7 @@ function tm(int $ms): string { $s = $ms / 1000; return sprintf('%d:%04.1f', (int
 
 <section class="hero">
   <div class="sun"></div>
-  <p class="tag"><span lang="en">Palmera Nights</span> · Zamana karşı yarış</p>
+  <p class="tag"><span lang="en">Palmera City</span> · Zamana karşı yarış</p>
   <ul class="rules">
     <li>Verilen görevi en kısa sürede bitir, ödülü kazan.</li>
     <li>Ödül kazanarak kasandaki parayı arttır ve lig atla.</li>
@@ -96,13 +96,13 @@ function tm(int $ms): string { $s = $ms / 1000; return sprintf('%d:%04.1f', (int
 </main>
 
 <footer class="foot">
-  <div class="logo small"><span class="l1">PALMERA</span><span class="l2">Nights</span></div>
+  <div class="logo small"><span class="l1">PALMERA</span><span class="l2">City</span></div>
   <p>Zamana karşı yarış · Tarayıcıda oynanır, kurulum gerekmez.</p>
   <nav>
     <a href="#" id="footplay">Oyna</a>
     <a href="#top">Başa dön</a>
   </nav>
-  <p class="copy">© <?= date('Y') ?> Palmera Nights. Tüm hakları saklıdır.</p>
+  <p class="copy">© <?= date('Y') ?> Palmera City. Tüm hakları saklıdır.</p>
 </footer>
 
 <div id="auth" class="modal<?= $openAuth ? '' : ' hidden' ?>">

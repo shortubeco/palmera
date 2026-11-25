@@ -148,7 +148,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0618; col
 }
 #missioncard.show { opacity: 1; }
 .mc-title { font: italic 900 34px Impact, sans-serif; color: var(--gold); letter-spacing: 2px; text-shadow: 0 3px 0 #000; }
-.mc-text { margin-top: 6px; font: 17px/1.45 Georgia, serif; color: #f4e9ff; }
+.mc-text { margin-top: 8px; font: 600 18px/1.5 "Segoe UI", Arial, sans-serif; color: #fff; }
 #big { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; }
 #big.show { animation: bigin 3.4s ease-out forwards; }
 #bigtitle { font: italic 900 92px Impact, "Arial Black", sans-serif; letter-spacing: 6px; -webkit-text-stroke: 3px #000; text-shadow: 0 6px 0 #000; }
