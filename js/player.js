@@ -300,7 +300,9 @@ export class Player {
 
     // binme istemi
     const nv = this.nearestVehicle();
-    if (nv && !this.swimming) this.prompt = nv.type === 'horse' ? 'F: Ata bin' : `F: ${nv.cfg.name}${nv.driver === 'ai' ? ' (sürücüyü indir)' : ''}`;
+    // istem: aracın model adı yerine ne yapılacağı (kullanıcı: "F: Arabaya bin")
+    const BIN = { horse: 'Ata bin', moto: 'Motora bin', boat: 'Tekneye bin', wagon: 'At arabasına bin' };
+    if (nv && !this.swimming) this.prompt = `F: ${BIN[nv.type] || 'Arabaya bin'}${nv.driver === 'ai' ? ' (sürücüyü indir)' : ''}`;
     // bindiyse burada bit: aşağıdaki satırlar dünya konumunu modele yazar; model artık aracın (at, motor, tekne)
     // gövdesinin çocuğu olduğundan sürücü yüzlerce metre öteye kayıp görünmez oluyordu
     if (input.hit('KeyF') && nv && this.fallT <= 0) { this.enterVehicle(nv); if (this.vehicle) return; }

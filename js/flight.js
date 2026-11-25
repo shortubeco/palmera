@@ -18,7 +18,7 @@ export const CASA_RW = { x0: -860, x1: -260, z: -14.3, hw: 17, y: 8.6 };
 // dir −1: her şey x'te aynalı (uçak pistin doğu ucunda batıya bakar, iniş batıdan gelir; rwX1 o zaman batı uç)
 const CP = { x: CASA.x + CASA_RW.x1 - 18, z: CASA.z + CASA_RW.z };
 export const AIRPORTS = {
-  palmera: { title: 'Palmera Bay', region: null, board: { x: -405, z: 607.5 }, plane: { x: -418, z: 660, heading: Math.PI / 2 }, exit: { x: -409, z: 651.6 }, rwX1: -40 },
+  palmera: { title: 'Palmera City', region: null, board: { x: -405, z: 607.5 }, plane: { x: -418, z: 660, heading: Math.PI / 2 }, exit: { x: -409, z: 651.6 }, rwX1: -40 },
   casablanca: { title: 'Casablanca', region: 'casablanca', dir: -1, board: { x: CP.x - 3, z: CP.z + 27 }, plane: { x: CP.x, z: CP.z, heading: -Math.PI / 2 }, exit: { x: CP.x - 9, z: CP.z + 8.4 }, rwX1: CASA.x + CASA_RW.x0 },
 };
 

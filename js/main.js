@@ -151,7 +151,7 @@ class Game {
     this.pendingCity = !params.get('pos') && city !== 'palmera' && AIRPORTS[city] ? city : null;
 
     // başlangıç araçları
-    this.addVehicle('sport', { x: 186.2, y: 0, z: 56, heading: Math.PI, color: '#ff5fa2' });
+    this.addVehicle('sport', { x: 186.2, y: 0, z: 56, heading: Math.PI, color: '#f2f2ee' });
     this.addVehicle('moto', { x: 186.4, y: 0, z: 66, heading: Math.PI, color: '#20c4ff' });
     this.lastCar = null;
 
@@ -199,6 +199,8 @@ class Game {
     }
     $('playhome').addEventListener('click', () => { if (!snd.checked) this.audio.muted = true; this.pendingCity = null; this.start(); });
     $('resume').addEventListener('click', () => this.setPaused(false));
+    $('introX').addEventListener('click', () => this.closeIntro());
+    $('introGo').addEventListener('click', () => this.closeIntro());
     $('prestart').addEventListener('click', () => this.restartGame());
     $('psound').addEventListener('click', () => { this.soundOff = !this.soundOff; this.audio.setMasterMuted(this.soundOff); $('psound').textContent = this.soundOff ? 'Ses: Kapalı' : 'Ses: Açık'; });
     document.addEventListener('pointerlockchange', () => {
@@ -213,22 +215,38 @@ class Game {
     $('title').classList.add('hidden');
     $('hud').classList.remove('hidden');
     this.audio.init(); this.audio.resume();
-    this.wantLock = true;
-    this.lock();
+    const lines = [];
     if (this.pendingCity) {
       // kalınan şehrin havaalanında, uçağın merdiveninin dibinde başla (bölge köprüdeki gibi yüklenir)
       const A = AIRPORTS[this.pendingCity];
       this.flights.reset();
       this.player.respawn(A.exit.x, A.exit.z, -Math.PI / 2);
       this.cam.yaw = Math.PI; this._camInit = false;
-      this.hud.notify(`${A.title}'nde kaldığın yerden devam ediyorsun. Palmera'ya dönmek için kalkış tabelasından bilet al.`, 8);
+      lines.push(`${A.title}'nde kaldığın yerden devam ediyorsun. Palmera'ya dönmek için kalkış tabelasından bilet al.`);
       this.pendingCity = null;
-      return;
+    } else {
+      const lg = this.league;
+      // Tahta ligi (görev Altın Veloce, işaret Ocean Drive'ın kuzeyinde): başlangıçtan yol tarifi (kullanıcı metni)
+      if (lg.me.league === 1 && lg.mission) lines.push(`Hedefin ${formatMoney(lg.L.limit)} toplamak. Önündeki beyaz arabaya bin ve caddeyi dümdüz takip et. Yolun sağında daire şeklinde bir ışık göreceksin. Arabadan inip dairenin içine gir ve E tuşuna bas. Görevin başlayacak.`);
+      else lines.push(lg.mission
+        ? `${lg.title} Ligi: hedefin ${formatMoney(lg.L.limit)}. Lig görevi ve yardım görevleri mini haritadaki renkli harfli yuvarlaklardır. Oraya git, ışık sütununun içine gir ve E'ye bas.`
+        : `${lg.title} Ligi'nin görevi yakında eklenecek. Şimdilik yardım görevleriyle (${formatMoney(500)}) para kazanabilirsin.`);
     }
-    const lg = this.league;
-    if (lg.mission) this.hud.notify(`${lg.title} Ligi: hedefin ${formatMoney(lg.L.limit)}. Lig görevi ve yardım görevleri mini haritadaki renkli harfli yuvarlaklardır. Oraya git, ışık sütununun içine gir ve E'ye bas.`, 10);
-    else this.hud.notify(`${lg.title} Ligi'nin görevi yakında eklenecek. Şimdilik yardım görevleriyle (${formatMoney(500)}) para kazanabilirsin.`, 10);
-    this.hud.notify('F: araca bin/in · M: harita · ESC: sıralaman ve tuşlar', 6);
+    lines.push('F: araca bin/in · M: harita · ESC: menü ve tuşlar');
+    // açıklamalar oyun başlamadan, imleç serbestken gösterilir; ✕ / BAŞLA (ya da Enter) ile kapanınca fare kilitlenir
+    if (params.get('autostart') === '1') { this.closeIntro(); return; }   // test: pencere yok
+    $('introList').replaceChildren(...lines.map((t) => { const li = document.createElement('li'); li.textContent = t; return li; }));
+    $('intro').classList.remove('hidden');
+    this.introOpen = true;
+  }
+  // açıklama penceresini kapat ve oyunu başlat (tıklama / tuş basışı kullanıcı hareketi → fare kilidi alınabilir)
+  closeIntro() {
+    $('intro').classList.add('hidden');
+    this.introOpen = false;
+    this.input.pressed.clear();
+    this.wantLock = true;
+    this.lock();
+    this.clock.getDelta();
   }
   lock() { try { const r = this.input.canvas.requestPointerLock?.(); if (r && r.catch) r.catch(() => {}); } catch (e) { /* jest gerekli */ } }
   setPaused(p) {
@@ -442,7 +460,7 @@ class Game {
     for (const s of this.world.parkingSpots) { s.vehicle = null; s.cooldown = 0; }
     for (const p of this.peds) p.dispose();
     this.peds.length = 0;
-    this.addVehicle('sport', { x: 186.2, y: 0, z: 56, heading: Math.PI, color: '#ff5fa2' });
+    this.addVehicle('sport', { x: 186.2, y: 0, z: 56, heading: Math.PI, color: '#f2f2ee' });
     this.addVehicle('moto', { x: 186.4, y: 0, z: 66, heading: Math.PI, color: '#20c4ff' });
     this.env.resetWeather();
     if (m) {
@@ -635,6 +653,12 @@ class Game {
     if (this.paused) {
       if ((this.input.hit('KeyP') || this.input.hit('Escape')) && performance.now() - (this.pausedAt || 0) > 250) this.setPaused(false);
       this.input.endFrame(); return;
+    }
+    if (this.introOpen) {
+      // oyun başı açıklama penceresi: oyun bekler, sahne çizilir; Enter / Space da başlatır
+      if (this.input.hit('Enter') || this.input.hit('NumpadEnter') || this.input.hit('Space')) this.closeIntro();
+      this.updateCamera(dt);   // arkada oyuncunun başlayacağı yer görünsün
+      this.input.endFrame(); this.composer.render(); return;
     }
     if (this.overOpen) {
       // panel açıkken oyun durur; 1/2/3 tuşlarıyla da seçilebilir

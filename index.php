@@ -52,7 +52,7 @@ function tm(int $ms): string { $s = $ms / 1000; return sprintf('%d:%04.1f', (int
   </ul>
   <button id="play" class="play">OYNA</button>
   <div class="shots">
-    <figure><img src="img/palmera.jpg" alt="Palmera Bay'de gece, sahil yolunda spor araba" loading="lazy" width="960" height="540"><figcaption>Palmera Bay · gece sahil yolu</figcaption></figure>
+    <figure><img src="img/palmera.jpg" alt="Palmera City'de gece, sahil yolunda spor araba" loading="lazy" width="960" height="540"><figcaption>Palmera City · gece sahil yolu</figcaption></figure>
     <figure><img src="img/wildwest.jpg" alt="Wild West kasabasının ana caddesi" loading="lazy" width="960" height="540"><figcaption>Wild West · kasaba caddesi</figcaption></figure>
     <figure><img src="img/casablanca.jpg" alt="Casablanca surları ve şehir, havadan" loading="lazy" width="960" height="540"><figcaption>Casablanca · uçakla git</figcaption></figure>
   </div>

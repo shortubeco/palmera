@@ -281,7 +281,7 @@ export class HUD {
     const W = c.clientWidth, H = c.clientHeight;
     if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
     const RM = this.regionMap();
-    document.querySelector('#bigmap .maphelp').textContent = (RM ? RM.title : 'Palmera Bay') + ' haritası · M ile kapat';
+    document.querySelector('#bigmap .maphelp').textContent = (RM ? RM.title : 'Palmera City') + ' haritası · M ile kapat';
     if (RM) {
       // uzak bölge: kendi haritası, oyuncu ve tabela
       const s = Math.min(W / RM.w, H / RM.h) * 0.9, ox = (W - RM.w * s) / 2, oy = (H - RM.h * s) / 2;

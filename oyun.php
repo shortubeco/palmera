@@ -64,7 +64,7 @@ window.ASSET_SIZES = <?= json_encode((object) $sizes) ?>;</script>
   <div class="logo">
     <div class="logo-top">PALMERA</div>
     <div class="logo-bottom">Nights</div>
-    <div class="logo-sub">Palmera Bay · Florida · 1986'dan beri suç</div>
+    <div class="logo-sub">Palmera City · Florida · 1986'dan beri suç</div>
   </div>
   <div class="menu">
     <button id="play">OYNA</button>
@@ -122,7 +122,7 @@ window.ASSET_SIZES = <?= json_encode((object) $sizes) ?>;</script>
 
 <div id="bigmap" class="hidden">
   <canvas id="bigmapcanvas"></canvas>
-  <div class="maphelp">Palmera Bay haritası · M ile kapat</div>
+  <div class="maphelp">Palmera City haritası · M ile kapat</div>
 </div>
 
 <div id="pause" class="hidden">
@@ -144,6 +144,13 @@ window.ASSET_SIZES = <?= json_encode((object) $sizes) ?>;</script>
     </div>
     <p>Paran ve ligin hesabına kaydedilir. <a href="./" target="_blank">Lig sıralamaları</a></p>
   </div>
+</div>
+<div id="intro" class="hidden">
+  <div class="ibox">
+    <button class="iclose" id="introX" title="Kapat ve başla">✕</button>
+    <h2>Hoş geldin!</h2>
+    <ul id="introList"></ul>
+    <button class="istart" id="introGo">BAŞLA</button>  </div>
 </div>
 <div id="over" class="hidden">
   <div class="obox">

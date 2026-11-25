@@ -1,4 +1,4 @@
-// Palmera Bay — şehir yerleşimi, zemin yüksekliği, çarpışma ve geometri üretimi
+// Palmera City — şehir yerleşimi, zemin yüksekliği, çarpışma ve geometri üretimi
 import * as THREE from 'three';
 import { mulberry32, clamp, lerp } from './util.js';
 import * as T from './textures.js';
