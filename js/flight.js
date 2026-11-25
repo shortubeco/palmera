@@ -218,7 +218,22 @@ function buildPlane() {
   const tailY = FUSE_Y + 0.9;
   add(fin([[-10.6, 0], [-15.1, 6.3], [-17.2, 6.3], [-17.6, 0]], 0.34), teal, 0, tailY, 0);
   add(fin([[-12.1, 2.0], [-13.0, 3.3], [-16.95, 3.3], [-17.15, 2.0]], 0.37, 0.03), pink, 0, tailY, 0);
-  add(fin([[-14.0, 4.7], [-14.45, 5.35], [-17.1, 5.35], [-17.2, 4.7]], 0.37, 0.03), new THREE.MeshStandardMaterial({ color: '#f6f4f0', roughness: 0.5 }), 0, tailY, 0);
+  // kuyruk logosu: beyaz çember içinde beyaz "P" (iki yanda, her yandan düz okunur)
+  {
+    const S = 256, cv = document.createElement('canvas'); cv.width = cv.height = S;
+    const x = cv.getContext('2d');
+    x.strokeStyle = '#ffffff'; x.lineWidth = 18;
+    x.beginPath(); x.arc(S / 2, S / 2, S / 2 - 14, 0, Math.PI * 2); x.stroke();
+    x.fillStyle = '#ffffff'; x.font = '900 170px "Arial Black", Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText('P', S / 2 + 4, S / 2 + 10);
+    const lt = new THREE.CanvasTexture(cv); lt.colorSpace = THREE.SRGBColorSpace; lt.anisotropy = 4;
+    const lm = new THREE.MeshBasicMaterial({ map: lt, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+    for (const s of [-1, 1]) {
+      const lg = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 2.1), lm);
+      lg.position.set(s * 0.245, tailY + 4.45, -15.65); lg.rotation.y = s * Math.PI / 2;
+      g.add(lg);
+    }
+  }
   add(new THREE.SphereGeometry(0.2, 8, 6), navMat('#ffffff'), 0, tailY + 6.45, -16.9);
   add(new THREE.SphereGeometry(0.16, 8, 6), navMat('#ff2020'), 0, FUSE_Y + FUSE_R + 0.12, 2);   // tepe çakar
   // iniş takımı: burun (çift teker) + ana (dört teker, iki yanda)
