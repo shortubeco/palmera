@@ -35,7 +35,7 @@ export const MAP = {
   draw(ctx) {
     const d = mapData; if (!d) return;
     const W = Math.ceil(this.w), H = Math.ceil(this.h), img = ctx.createImageData(W, H), px = img.data;
-    const sea = [18, 60, 92], lo = [232, 170, 62], hi = [200, 150, 70];
+    const sea = [18, 60, 92], lo = [242, 204, 128], hi = [214, 174, 104];
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const wx = this.x0 + x + 0.5, wz = this.z0 + y + 0.5, g = d.ground(wx, wz), q = (y * W + x) * 4;
       let c = sea;
@@ -87,13 +87,36 @@ export function build(game, kit) {
 
   // ---------- modeller ----------
   const U = { night: { value: 0 } };
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
-  mat.onBeforeCompile = (sh) => {
+  // Duvar renkleri (kullanıcı isteği): paketin gri duvarları (Wall_0 167,164,153 / Wall_1 146,140,125 / taş 159,159,159)
+  // surlar, kuleler, kale, liman → açık kahverengi; evler → kopya başına beyaz / koyu sarı / açık kahverengi.
+  // Ev rengi kopyanın konumundan (örnek matrisi) karılır: ayıklamada sıra değişse de her ev hep aynı renkte kalır.
+  const WALL_GLSL = `
+    vec3 cr = color.rgb;
+    float w0 = step(length(cr - vec3(167.0, 164.0, 153.0) / 255.0), 0.012);
+    float w1 = step(length(cr - vec3(146.0, 140.0, 125.0) / 255.0), 0.012);
+    float w2 = step(length(cr - vec3(159.0, 159.0, 159.0) / 255.0), 0.012);
+    float isWall = max(w0, max(w1, w2));
+    #ifdef HOUSE
+      vec3 io = instanceMatrix[3].xyz + modelMatrix[3].xyz;
+      float hr = fract(sin(dot(floor(io * 0.5), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+      vec3 wc = hr < 0.4 ? vec3(0.95, 0.93, 0.88) : hr < 0.7 ? vec3(0.78, 0.56, 0.25) : vec3(0.80, 0.64, 0.48);
+    #else
+      vec3 wc = vec3(0.78, 0.63, 0.46);
+    #endif
+    vColor.rgb = mix(cr, wc * (w0 + w1 * 0.86 + w2 * 0.93), isWall);
+    // zemin (Terrain 1, dönüştürücüde 226,146,34): sarı evlerden ayrılsın diye daha açık kum sarısı
+    float ter = step(length(cr - vec3(226.0, 146.0, 34.0) / 255.0), 0.012);
+    vColor.rgb = mix(vColor.rgb, vec3(0.95, 0.80, 0.50), ter);`;
+  const makeMat = (house) => {
+    const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
+    if (house) m.defines = { HOUSE: '' };
+    m.onBeforeCompile = (sh) => {
     sh.uniforms.uNight = U.night;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying float vFlag;\nvarying float vLit;')
       .replace('#include <color_vertex>', `#include <color_vertex>
         vFlag = color.a;
+        ${WALL_GLSL}
         vColor.rgb = pow(vColor.rgb, vec3(2.2));   // paket renkleri sRGB
         vec4 cwp = modelMatrix * instanceMatrix * vec4(position, 1.0);
         vLit = step(fract(sin(dot(floor(cwp.xyz / vec3(1.7, 2.9, 1.7)), vec3(12.9898, 78.233, 37.719))) * 43758.5453), 0.55);`);
@@ -104,7 +127,11 @@ export function build(game, kit) {
         float isWin = step(abs(vFlag - 0.502), 0.1), isLamp = step(abs(vFlag - 0.251), 0.1);
         totalEmissiveRadiance += isWin * vLit * uNight * vec3(1.0, 0.62, 0.28) * 1.7;
         totalEmissiveRadiance += isLamp * (0.12 + uNight * 2.2) * vec3(1.0, 0.55, 0.18);`);
+    };
+    return m;
   };
+  const mat = makeMat(false), houseMat = makeMat(true);
+  const HOUSE_RE = /^(civilian_house|roof_building|overhang_building|balcony|port_house|building_base)/;
   // aynı veri (aynalı türler köşeleri paylaşır) tek GPU tamponu olsun
   const attrs = new Map();
   const attr = (key, make) => attrs.get(key) || attrs.set(key, make()).get(key);
@@ -124,7 +151,7 @@ export function build(game, kit) {
     const b = k.box, sz = [b[3] - b[0], b[4] - b[1], b[5] - b[2]];
     const sc = sz.map((s) => Math.max(s * 32767 / 65535, 1e-3));
     const Dm = new THREE.Matrix4().makeScale(...sc).setPosition(...sz.map((s, i) => b[i] + (s > 1e-6 ? s * 32768 / 65535 : sc[i])));
-    return { g, Dm, list: [], always: /^(terrain_|cliff_)/.test(k.name) };
+    return { g, Dm, list: [], always: /^(terrain_|cliff_)/.test(k.name), house: HOUSE_RE.test(k.name) };
   });
   const OM = new THREE.Matrix4().makeTranslation(O.x, 0, O.z), M = new THREE.Matrix4();
   for (const r of j.inst) {
@@ -136,7 +163,7 @@ export function build(game, kit) {
   }
   for (const K of kinds) {
     if (!K.list.length) continue;
-    const m = new THREE.InstancedMesh(K.g, mat, K.list.length);
+    const m = new THREE.InstancedMesh(K.g, K.house ? houseMat : mat, K.list.length);
     m.frustumCulled = false;   // ayıklama kopya başına aşağıda
     m.count = 0; m.visible = false;
     const big = Math.max(...K.list.map((I) => I.s.radius));
