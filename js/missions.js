@@ -155,12 +155,7 @@ export class Missions {
   }
   start(m) {
     const g = this.game;
-    // (saat görevde değişmez: oyun açılışında rastgele seçilir — env.js randomStartHour)
-    // hava da her görevde değişir: güneşli %40, bulutlu %30, yağmurlu %30 (art arda aynısı gelmez)
-    const WX = ['sun', 'sun', 'cloudy', 'cloudy', 'rain', 'rain', 'sun', 'cloudy', 'rain', 'sun'];
-    let w; do { w = WX[Math.floor(Math.random() * WX.length)]; } while (w === this.lastWeather);
-    this.lastWeather = w;
-    g.env.setWeather(w);
+    // (saat ve hava görevde değişmez: oyun açılışında / başa dönüşte rastgele — env.js randomStartHour, randomWeather)
     g.hud.mission(m.name + ' Görevi', m.intro);
     g.hud.big(m.name.toUpperCase(), 'Görev başladı', m.color, 2.5);
     g.audio?.jingle('start');

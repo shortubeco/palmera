@@ -256,7 +256,17 @@ export class Environment {
   // hemen yağdır (test: ?rain=1); hours verilmezse durmaz
   forceRain(hours = Infinity) { this.rain = this.rainTarget = 1; this.wet = 1; this.nextRainAt = this.clock; this.rainEndAt = this.clock + hours; }
 
-  // görev başında hava (missions.js): 'sun' açık, 'cloudy' kapalı/bulutlu, 'rain' yağmurlu.
+  // oyun açılışı ve "oyunun başına dön": rastgele hava — güneşli %40, bulutlu %30, yağmurlu %30
+  // (art arda aynısı gelmez; görev başında hava değişmez — kullanıcı kararı)
+  randomWeather() {
+    const WX = ['sun', 'sun', 'cloudy', 'cloudy', 'rain', 'rain', 'sun', 'cloudy', 'rain', 'sun'];
+    let w; do { w = WX[Math.floor(Math.random() * WX.length)]; } while (w === this.lastWeather);
+    this.lastWeather = w;
+    this.setWeather(w);
+    return w;
+  }
+
+  // hava: 'sun' açık, 'cloudy' kapalı/bulutlu, 'rain' yağmurlu.
   // Bulut ve yağmur birkaç oyun saati sürer, sonra hava kendiliğinden açılır (yağmur takvimi baştan kurulur).
   setWeather(kind) {
     if (kind === 'rain') {

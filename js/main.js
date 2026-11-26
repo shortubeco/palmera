@@ -132,7 +132,9 @@ class Game {
       sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40; sc.updateProjectionMatrix();
     }
     // yeni üye (hiç görev başlatmamış): ilk oyun 15:00'te; sonraki açılışlarda saat rastgele (env.randomStartHour)
-    if (this.league.me.played === false) this.env.hour = 15;
+    // hava da açılışta rastgele (yeni üyenin ilk oyunu güneşli)
+    if (this.league.me.played === false) { this.env.hour = 15; this.env.clock = 15; this.env.setWeather('sun'); }
+    else this.env.randomWeather();
     if (params.get('t')) this.env.hour = parseFloat(params.get('t'));
     if (params.get('rain')) this.env.forceRain();
     this.effects = new Effects(this.scene);
@@ -153,7 +155,7 @@ class Game {
     this.pendingCity = !params.get('pos') && city !== 'palmera' && AIRPORTS[city] ? city : null;
 
     // başlangıç araçları
-    this.addVehicle('sport', { x: 186.2, y: 0, z: 56, heading: Math.PI, color: '#f2f2ee' });
+    this.addVehicle('sport', { x: 186.2, y: 0, z: 56, heading: Math.PI, color: '#d4d4cf' });
     this.addVehicle('moto', { x: 186.4, y: 0, z: 66, heading: Math.PI, color: '#20c4ff' });
     this.lastCar = null;
 
@@ -462,16 +464,16 @@ class Game {
     for (const s of this.world.parkingSpots) { s.vehicle = null; s.cooldown = 0; }
     for (const p of this.peds) p.dispose();
     this.peds.length = 0;
-    this.addVehicle('sport', { x: 186.2, y: 0, z: 56, heading: Math.PI, color: '#f2f2ee' });
+    this.addVehicle('sport', { x: 186.2, y: 0, z: 56, heading: Math.PI, color: '#d4d4cf' });
     this.addVehicle('moto', { x: 186.4, y: 0, z: 66, heading: Math.PI, color: '#20c4ff' });
-    this.env.resetWeather();
+    // hava yalnız oyunun başına dönüşte değişir (görevi yeniden başlatınca olduğu gibi kalır)
     if (m) {
       P.respawn(m.start.x, m.start.z, 0);
       this.cam.yaw = 0;
       this.missions.start(m);
     } else {
       P.respawn(190.5, 52, -Math.PI / 2);
-      this.cam.yaw = -Math.PI / 2; this.env.hour = randomStartHour(); this.env.envTimer = 0;
+      this.cam.yaw = -Math.PI / 2; this.env.hour = randomStartHour(); this.env.randomWeather(); this.env.envTimer = 0;
       if (!silent) this.hud.notify('Oyunun başına döndün. Paran ve ligin duruyor.', 5);
     }
     this.cam.pitch = 0.18; this._camInit = false;

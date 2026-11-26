@@ -13,7 +13,7 @@ export const TYPES = {
   hatch: { name: 'Pico', len: 4.15, wid: 1.85, wheelR: 0.31, mass: 1100, accel: 12, maxSpeed: 41, gears: 5, reverse: 11, brake: 30, grip: 8.5, latMax: 11.5, steer: 0.64, hp: 850, colors: ['#e8c21e', '#d94a3a', '#3aa0d9', '#f0ede4', '#4bb07a', '#ef7fb0'] },
   taxi: { name: 'Cortez Taksi', len: 4.7, wid: 1.9, wheelR: 0.33, mass: 1400, accel: 11.5, maxSpeed: 51, gears: 4, reverse: 11, brake: 30, grip: 8, latMax: 11, steer: 0.6, hp: 1000, colors: ['#ffc21a'] },
   pickup: { name: 'Bayou Hauler', len: 5.2, wid: 2.05, wheelR: 0.405, mass: 2100, accel: 9, maxSpeed: 44, gears: 4, reverse: 10, brake: 26, grip: 7, latMax: 10, steer: 0.55, hp: 1300, colors: ['#a33b20', '#2f4f6f', '#e0dcd0', '#3d3d3d', '#6b7f3a', '#d98c2b'] },
-  van: { name: 'Mule', len: 5.0, wid: 1.95, wheelR: 0.31, mass: 2300, accel: 6.5, maxSpeed: 35, gears: 4, reverse: 9, brake: 24, grip: 6.5, latMax: 9, steer: 0.55, hp: 1400, colors: ['#f2f2ee', '#ffd42a', '#3d5a80', '#b8bcc0', '#8c2f2f'] },
+  van: { name: 'Mule', len: 5.0, wid: 1.95, wheelR: 0.31, mass: 2300, accel: 6.5, maxSpeed: 35, gears: 4, reverse: 9, brake: 24, grip: 6.5, latMax: 9, steer: 0.55, hp: 1400, colors: ['#d4d4cf', '#ffd42a', '#3d5a80', '#b8bcc0', '#8c2f2f'] },
   police: { name: 'Interceptor', len: 4.7, wid: 1.9, wheelR: 0.33, mass: 1600, accel: 14.5, maxSpeed: 61, gears: 5, reverse: 12, brake: 34, grip: 9.5, latMax: 13, steer: 0.58, hp: 1200, colors: ['#eef0f4'] },
   moto: { name: 'Raya 600', len: 2.1, wid: 0.75, wheelR: 0.32, mass: 220, accel: 18.5, maxSpeed: 57, gears: 6, reverse: 4, brake: 30, grip: 11, latMax: 14, steer: 0.75, hp: 450, colors: ['#e3262f', '#20c4ff', '#ffcc00', '#111111', '#7dff6b'] },
   boat: { name: 'Marlin 33', len: 6.5, wid: 2.4, wheelR: 0.0, mass: 1800, accel: 9.5, maxSpeed: 40, gears: 1, waterTop: 17.5, reverse: 6, brake: 8, grip: 1.6, latMax: 6, steer: 0.6, hp: 900, colors: ['#f5f5f5'], water: true },
@@ -71,7 +71,7 @@ export async function loadVehicleKit(base = 'assets/web/') {
   for (const [k, m] of Object.entries(j.models)) {
     models[k] = { body: geo(m.body), wheels: m.wheels.map((w) => ({ geo: geo(w.geo), pivot: w.pivot, front: w.front })), roof: m.roof, side: m.side, map: m.tex ? maps[m.tex] : null };
   }
-  const rest = new THREE.MeshStandardMaterial({ map: atlas, roughness: 0.45, metalness: 0.3 });
+  const rest = new THREE.MeshStandardMaterial({ map: atlas, roughness: 0.45, metalness: 0.3, envMapIntensity: 0.35 });
   const glass = new THREE.MeshStandardMaterial({ color: '#1a2430', roughness: 0.08, metalness: 0.6, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide });
   VKIT = { models, rest, glass };
   return VKIT;
@@ -216,7 +216,8 @@ export function buildVehicleMesh(type, color) {
   const cfg = TYPES[type];
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
-  const paint = new THREE.MeshStandardMaterial({ color, metalness: 0.55, roughness: 0.32 });
+  // (2026-11-26: güneşi/gökyüzünü çok yansıtıyordu, tavan-kaput beyazlaşıyordu → metalness 0.55 → 0.3, roughness 0.32 → 0.5, envMapIntensity 0.35)
+  const paint = new THREE.MeshStandardMaterial({ color, metalness: 0.3, roughness: 0.5, envMapIntensity: 0.35 });
   const brake = new THREE.MeshBasicMaterial({ color: '#550000', toneMapped: false });
   const parts = { paint, brake, wheels: [], frontPivots: [], body, extras: [] };
   const L = cfg.len, W = cfg.wid, R = cfg.wheelR;
@@ -404,7 +405,7 @@ export class Vehicle {
     // görsel hasar: boyayı koyulaştır
     const k = clamp(this.health / this.cfg.hp, 0, 1);
     this.parts.paint.color.set(this.color).lerp(new THREE.Color('#2a2622'), (1 - k) * 0.5);
-    this.parts.paint.roughness = 0.32 + (1 - k) * 0.5;
+    this.parts.paint.roughness = 0.5 + (1 - k) * 0.4;
   }
 
   update(dt, game) {
