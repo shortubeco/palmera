@@ -315,7 +315,7 @@ class Game {
     const cur = this.drift.active || this.drift.lastId ? this.drift.def?.id : null;
     grid.innerHTML = Object.values(cfg).map((P) => {
       const b = best[P.id];
-      const rec = b ? `En iyi: <b>${b.total} puan</b> · ${(b.timeMs / 1000).toFixed(2).replace('.', ',')} sn` : 'Henüz oynamadın';
+      const rec = b ? `En iyi: <b>${b.total} puan</b>${b.timeMs != null ? ' · ' + (b.timeMs / 1000).toFixed(2).replace('.', ',') + ' sn' : ''}` : 'Henüz oynamadın';
       return `<div class="pcard lv-${lv[P.level] || 'easy'}${P.id === cur ? ' now' : ''}" data-park="${P.id}">` +
         `<div class="pimg"><span class="psun"></span><span class="proad"></span><span class="pspot"></span><span class="plevel">${esc(P.level)}</span><span class="ptitle">${esc(P.title)}</span></div>` +
         `<div class="pinfo">${esc(P.route || '')}</div><div class="pbest">${P.id === cur ? 'Şu an oynuyorsun · ' : ''}${rec}</div><span class="pbtn">OYNA</span></div>`;

@@ -220,9 +220,11 @@ try {
             $b = $pdo->prepare('SELECT time_ms, total, park_score FROM park_best WHERE player_id = ? AND park = ? FOR UPDATE');
             $b->execute([$pid, $park]);
             $prev = $b->fetch();
-            $new = ['time' => !$prev || $ms < (int) $prev['time_ms'], 'total' => !$prev || $total > (int) $prev['total'], 'park' => !$prev || $parkScore > (int) $prev['park_score']];
+            // süre rekoru yalnız park puanı yeterliyse (park yerine kabaca atıp hızlı olmak süre rekoru sayılmaz)
+            $timeOk = $parkScore >= parkTimeMin($park);
+            $new = ['time' => $timeOk && (!$prev || $prev['time_ms'] === null || $ms < (int) $prev['time_ms']), 'total' => !$prev || $total > (int) $prev['total'], 'park' => !$prev || $parkScore > (int) $prev['park_score']];
             if (!$prev) {
-                $pdo->prepare('INSERT INTO park_best (player_id, park, time_ms, total, park_score) VALUES (?, ?, ?, ?, ?)')->execute([$pid, $park, $ms, $total, $parkScore]);
+                $pdo->prepare('INSERT INTO park_best (player_id, park, time_ms, total, park_score) VALUES (?, ?, ?, ?, ?)')->execute([$pid, $park, $timeOk ? $ms : null, $total, $parkScore]);
             } else {
                 if ($new['time']) $pdo->prepare('UPDATE park_best SET time_ms = ?, time_at = now() WHERE player_id = ? AND park = ?')->execute([$ms, $pid, $park]);
                 if ($new['total']) $pdo->prepare('UPDATE park_best SET total = ?, total_at = now() WHERE player_id = ? AND park = ?')->execute([$total, $pid, $park]);
@@ -230,7 +232,7 @@ try {
             }
             $pdo->commit();
             out(['ok' => true, 'timeMs' => $ms, 'timeScore' => $timeScore, 'align' => $align, 'center' => $center, 'penalty' => $penalty,
-                 'total' => $total, 'park' => $parkScore, 'newBest' => $new, 'best' => playerPark($pid, $park)]);
+                 'total' => $total, 'park' => $parkScore, 'newBest' => $new, 'timeOk' => $timeOk, 'timeMin' => parkTimeMin($park), 'best' => playerPark($pid, $park)]);
         }
 
         case 'pfail': {   // park edilemedi (park yerini geçti, dışarıda durdu, araçtan indi…)

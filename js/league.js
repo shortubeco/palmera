@@ -109,7 +109,7 @@ export class League {
     if (D?.active && D.def) {
       const P = cfg[D.def.id] || D.def, b = this.parkBest?.[D.def.id];
       // başlığın altında iki satır: en yüksek puan, en iyi süre (saat bunların altında, #clockrow)
-      const pts = b ? b.total : '–', tm = b ? (b.timeMs / 1000).toFixed(2).replace('.', ',') : '–';
+      const pts = b ? b.total : '–', tm = b && b.timeMs != null ? (b.timeMs / 1000).toFixed(2).replace('.', ',') : '–';
       el.innerHTML = `<b>${esc(String(P.title).toLocaleUpperCase('tr'))}</b><small>En yüksek puan: ${pts}</small><small>En iyi süre: ${tm}</small>`;
     } else el.innerHTML = '<b>KEŞİF</b><small>ESC → Diğer oyunlar</small>';
   }

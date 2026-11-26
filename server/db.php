@@ -62,12 +62,30 @@ function db(): PDO {
     }
     // Drift Park tabloları: eski kurulumlarda yoksa ilk açılışta kurulur; yeni eklenen park oyunlarına da botlar rekor alır
     if (!$pdo->query("SELECT to_regclass('public.park_best')")->fetchColumn()) createParkTables($pdo);
+    migrateParkTime($pdo);
     $have = $pdo->query('SELECT DISTINCT park FROM park_best')->fetchAll(PDO::FETCH_COLUMN);
     if (array_diff(array_keys(PARKS + TEST_PARKS), array_map('intval', $have))) {
         require_once __DIR__ . '/seed.php';
         seedParkBots($pdo);   // yalnız hiç rekoru olmayan park oyunlarına
     }
     return $pdo;
+}
+
+// süre rekoru yalnız park puanı ≥ PARK_TIME_MIN olan denemelerden (2026-11-27). Eski kurulumlarda bir kez:
+// time_ms boş olabilir yapılır, gerçek oyuncuların süre rekoru park_runs geçmişinden bu kurala göre yeniden hesaplanır (botlar aynı).
+const PARK_TIME_MIN = 70;
+function parkTimeMin(int $park): int { return PARK_TIME_MIN * ((PARKS[$park]['align'] ?? false) ? 2 : 1); }   // hizalamalı oyunda park puanı 200 üzerinden
+function migrateParkTime(PDO $pdo): void {
+    $nn = $pdo->query("SELECT is_nullable FROM information_schema.columns WHERE table_name = 'park_best' AND column_name = 'time_ms'")->fetchColumn();
+    if ($nn !== 'NO') return;
+    $pdo->beginTransaction();
+    $pdo->exec('ALTER TABLE park_best ALTER COLUMN time_ms DROP NOT NULL');
+    foreach (PARKS as $park => $P) {
+        $st = $pdo->prepare("UPDATE park_best b SET time_ms = (SELECT MIN(r.time_ms) FROM park_runs r WHERE r.player_id = b.player_id AND r.park = b.park AND r.result = 'done' AND r.park_score >= ?)
+                              WHERE b.park = ? AND b.player_id IN (SELECT id FROM players WHERE NOT bot)");
+        $st->execute([parkTimeMin($park), $park]);
+    }
+    $pdo->commit();
 }
 
 function createParkTables(PDO $pdo): void {
@@ -91,7 +109,7 @@ CREATE INDEX IF NOT EXISTS park_runs_player ON park_runs (player_id, id DESC);
 CREATE TABLE IF NOT EXISTS park_best (
   player_id   INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
   park        SMALLINT NOT NULL,
-  time_ms     INT NOT NULL,
+  time_ms     INT,             -- süre rekoru (park puanı ≥ 70 olan denemelerden; yoksa boş)
   time_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   total       SMALLINT NOT NULL,
   total_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -109,12 +127,13 @@ SQL);
 function parkBoards(int $park, int $n = 20): array {
     $pdo = db();
     $q = function (string $cols, string $order) use ($pdo, $park, $n) {
-        $st = $pdo->prepare("SELECT p.username, $cols FROM park_best b JOIN players p ON p.id = b.player_id WHERE b.park = ? ORDER BY $order LIMIT " . (int) $n);
+        $where = str_starts_with($cols, 'b.time_ms') ? ' AND b.time_ms IS NOT NULL' : '';   // süre rekoru olmayan süre tablosunda yok
+        $st = $pdo->prepare("SELECT p.username, $cols FROM park_best b JOIN players p ON p.id = b.player_id WHERE b.park = ?$where ORDER BY $order LIMIT " . (int) $n);
         $st->execute([$park]);
         return $st->fetchAll();
     };
     return [
-        'time'  => $q('b.time_ms', 'b.time_ms ASC, b.time_at ASC'),
+        'time'  => $q('b.time_ms', 'b.time_ms ASC NULLS LAST, b.time_at ASC'),
         'total' => $q('b.total', 'b.total DESC, b.total_at ASC'),
         'park'  => $q('b.park_score', 'b.park_score DESC, b.park_at ASC'),
     ];
@@ -134,8 +153,8 @@ function playerPark(int $pid, int $park): ?array {
     $n = $pdo->prepare('SELECT COUNT(*) FROM park_best WHERE park = ?');
     $n->execute([$park]);
     return [
-        'timeMs' => (int) $b['time_ms'], 'total' => (int) $b['total'], 'park' => (int) $b['park_score'],
-        'timeRank' => $rank('time_ms < ?', $b['time_ms']), 'totalRank' => $rank('total > ?', $b['total']), 'parkRank' => $rank('park_score > ?', $b['park_score']),
+        'timeMs' => $b['time_ms'] === null ? null : (int) $b['time_ms'], 'total' => (int) $b['total'], 'park' => (int) $b['park_score'],
+        'timeRank' => $b['time_ms'] === null ? null : $rank('time_ms < ?', $b['time_ms']), 'totalRank' => $rank('total > ?', $b['total']), 'parkRank' => $rank('park_score > ?', $b['park_score']),
         'players' => (int) $n->fetchColumn(),
     ];
 }

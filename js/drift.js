@@ -432,11 +432,13 @@ export class DriftPark {
     if (!el) { el = document.createElement('div'); el.className = 'recs'; el.style.cssText = 'margin-top:12px;padding-top:10px;border-top:1px solid #444;font-size:14px'; box.insertBefore(el, box.lastElementChild); }
     if (j.note) { el.innerHTML = `<div style="color:#bbb">${j.note}</div>`; return; }
     const B = j.best, N = j.newBest || {};
-    const line = (label, val, rank, isNew) => `<div style="display:flex;justify-content:space-between;gap:8px;margin:4px 0"><span>${label}</span><span><b>${val}</b> <span style="color:#bbb">· ${rank}. / ${B.players}</span>${isNew ? ' <b style="color:#3ddc84">YENİ REKOR!</b>' : ''}</span></div>`;
+    const line = (label, val, rank, isNew) => `<div style="display:flex;justify-content:space-between;gap:8px;margin:4px 0"><span>${label}</span><span><b>${val}</b>${rank ? ` <span style="color:#bbb">· ${rank}. / ${B.players}</span>` : ''}${isNew ? ' <b style="color:#3ddc84">YENİ REKOR!</b>' : ''}</span></div>`;
     el.innerHTML = '<div style="color:#ffd21a;font-weight:700;margin-bottom:4px">Rekorların</div>'
-      + line('En kısa süre', fmt(B.timeMs / 1000) + ' sn', B.timeRank, N.time)
+      + line('En kısa süre', B.timeMs == null ? '–' : fmt(B.timeMs / 1000) + ' sn', B.timeRank, N.time)
       + line('Toplam puan', B.total, B.totalRank, N.total)
-      + line('En iyi park', B.park, B.parkRank, N.park);
+      + line('En iyi park', B.park, B.parkRank, N.park)
+      // park puanı yetmediyse süre rekor sayılmadı: neden olduğunu söyle
+      + (j.timeOk === false ? `<div style="margin-top:6px;color:#ffb36b">Süre rekoru için park puanı en az ${j.timeMin} olmalı.</div>` : '');
   }
   hideResult() {
     this.dom.result.style.display = 'none';

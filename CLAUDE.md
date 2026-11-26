@@ -1,4 +1,4 @@
-# Palmera Nights — proje notları
+# Grand Drift Park (eski adı Palmera Nights) — proje notları
 
 Tarayıcıda oynanan, GTA türünde üçüncü şahıs açık dünya suç oyunu. Kurgusal Florida sahil şehri **Palmera Bay** (palmiyeler, kumsal, gün batımında pembe-mor gökyüzü, gece neon). Ad, şehir, karakterler ve görsel tasarım tamamen özgün; gerçek bir oyunun adı, logosu, karakteri ya da haritası kullanılmaz.
 
@@ -193,7 +193,39 @@ Kurallar **`öneriler.md`**'de (kullanıcıyla kararlaştırıldı). Özet: 7 li
 - **Test notu**: oyun artık `oyun.php?debug=1&mute=1&autostart=1&q=low` (giriş gerekir; scratchpad `pt/lig.mjs`, `pt/lig2.mjs` örnek) ya da `oyun.php?nosave=1&...` (çevrimdışı, giriş yok). Test hesaplarını sonra sil (`DELETE FROM players WHERE username LIKE 'test_%'`).
 - **Doğrulanmadı**: gerçek tarayıcıda oynanış, telefon görünümü, hostingte PostgreSQL bağlantısı.
 
-## KALDIĞIMIZ YER (2026-11-25 akşam) — buradan devam
+## KALDIĞIMIZ YER (2026-11-27) — GRAND DRIFT PARK — buradan devam
+**Oyunun konsepti değişti (2026-11-26, kullanıcı):** artık GTA tarzı görev/para yok. Oyunun adı **Grand Drift Park**: Veloce GT ile caddede hızlan, el freniyle drift yapıp sarı çizgili park yerine park et; süre + park puanı. Şehir Palmera City olarak kalıyor (harita, havaalanı adları). Eski sistemler kodda duruyor ama kapalı.
+
+**Oyun (js/drift.js, `DriftPark`)** — park oyunları `PARKS` (yerleşim) + sunucuda `server/db.php PARKS` (puan kuralları, aynı id; oyuna `window.PARK_CFG` ile gelir):
+| id | ad | zorluk | rota | el freni hakkı |
+|---|---|---|---|---|
+| 1 | Virajsız Park | Kolay | x=−60 kuzeye dümdüz, park yeri (−54,6; −2) | 1 |
+| 2 | Tek Viraj | Orta | x=−220 kuzeye, z=40'ta sağa, 205 m sonra (−15; 45,4) | 2 |
+| 3 | 2 Viraj | Zor | x=−140 kuzeye, z=40'ta sola, x=−300'de sağa, z=−160 (−294,6) | 3 |
+- Park yeri 3,2 × 14 m (sağ park şeridi, cadde ekseninden 5,4 m); önündeki 100 m park şeridi boş tutulur (`CLEAR_BEFORE`), park noktaları kapanır/açılır.
+- Akış: 3-2-1 geri sayım (araç kilitli: fren değil el freni — fren duran araçta geri vitesti) → sürüş. El freni ≥ `minKmh` (70) çalışır, altında ortada uyarı. Son hak dışındakiler köşe drifti (bırakınca normale döner); geçilen her virajda hak düşer (`capBrakes`, drift'siz dönse de). Son hak = park drifti: gaz/fren kilitli, Space bırakılınca bir daha çekilemez ("El freni hakkın bitti").
+- Sonuç: içeride durunca hesap; son el freni bırakıldıktan / dışarıda durduktan 3 sn sonra hâlâ dışarıdaysa başarısız (`RELEASE_GRACE`); araç merkezi park alanının bitiş çizgisini geçince "Park yerini geçtin" (`PASS_MARGIN` 0).
+- Puanlar: Park Süresi (fast→100, zero→0 doğrusal), Park Puanı (merkezden uzaklık), hizalama yalnız `align: true` oyunlarda (şimdilik hiçbiri), çarpma cezası −10/−25/−50 (hasar olayından). Toplam = süre + park (+ hizalama) − ceza; en iyi park = park (+ hizalama).
+- **Süre rekoru yalnız park puanı ≥ 70** (`PARK_TIME_MIN`, server/db.php; hizalamalıda ×2). Altındaysa panelde "Süre rekoru için park puanı en az 70 olmalı". `park_best.time_ms` boş olabilir (`migrateParkTime` bir kez çalışır).
+- Ekran: süre + altında el freni hakları (sarı/gri daireler); 30 m kala Park Puanı göstergesi; ortada uyarılar (`flash`); sonuçta kamera park alanına sığacak yükseklikten tepeden (ideal konum beyaz kesikli 2,5 × 6,5 m, aracın izi camgöbeği); "Tekrar dene (Enter)" / "Kapat". Hava güneşli, saat 13:00 sabit (`weather`, `hour`). GPS: `route` köşeleri (`missions.objective.path`, hud.js).
+- Müzik: özgün 80'ler rock (audio.js `drift()`, 116 BPM), geri sayımda giriş, BAŞLA'da tam parça. **Ses ve Müzik ayrı** (başlık + ESC; `pn_music` localStorage). Müzik açıkken zamanlayıcı bazen 43 ms'ye çıkıyor (iyileştirilebilir).
+- El freni fiziği: vehicles.js `HB_DECEL` 5 m/sn² (düşük hızda sürünmesin). Araç boyası: metalness 0,3, roughness 0,5, envMapIntensity 0,35; camlar: `veh_atlas.png` cam hücresi koyu boyandı (atlas.ps1 yeniden üretirse geri gelir!).
+
+**Sunucu** (lig.php): `pstart`, `pfinish` (süre ≤ sunucu süresi + 3 sn, ≥ `min`; puan 0–100; ceza 5'in katı; süre puanı ve toplamı sunucu hesaplar), `pfail`, GET `pboard&park=N`, GET `pme` (oyuncunun rekorları). Tablolar `park_runs`, `park_best` (ilk açılışta kurulur + `seedParkBots`). `TEST_PARKS` 4–7 = landing'deki "Test 1–4" bölümleri (oynanamaz, yalnız bot verisi; gerçek oyun eklenince numarası oradan çıkar, test kayıtları silinir). `tools/seed_bots.php` park rekorlarını da yeniden üretir.
+
+**Arayüz:**
+- Landing (index.php): "Drift yap, park et" + 3 kural; park oyunu kartları (kodla çizilmiş resim kutusu, başlık, zorluk rozeti, tarif, kartın altında OYNA → `oyun.php?park=N`; girişsizse giriş penceresi sonra o oyun); "Rekorlar": 7 bölüm (3 oyun + Test 1–4) × 3 tablo (En yüksek puan, En iyi süre, En iyi park). Sağ üst yalnız kullanıcı adı + Çıkış.
+- Oyun: başlık ekranı logo "GRAND DRIFT Park", tuş listesi "Tuşlar" (yalnız araç tuşları, klavye tuşu kutuları); keşif arabanın içinde başlar; ESC: Devam et / Ses / Müzik / Oyunun başına dön (bu oturumda park oyunu oynandıysa onun başı) / **Diğer oyunlar** (kartlar; sayfa yenilemeden park oyunu değiştirir); sağ üst rozet: oyun adı + "En yüksek puan" + "En iyi süre" (keşifte "KEŞİF"), para gizli.
+- **Görevler kapalı** (missions.js `MISSIONS_ON = false`); Banka Soygunu (js/heist.js) + gezilebilir banka (west.js) yapıldı ama kapalı.
+- Model/doku önbelleği: oyun.php `ASSET_VER` → progress.js `assetUrl` (?v=), `THREE.DefaultLoadingManager.setURLModifier`; `assets/web/.htaccess` 1 yıl önbellek (yalnız hosting).
+
+**Hosting:** 2026-11-27'de yeni yayin.zip yüklendi, çalışıyor. **DİKKAT: yüklerken `config.local.php` silinmemeli** (zipte yok; silinince tüm sayfalar "Sunucu hatası" verdi). Süre-rekoru kuralı (park puanı ≥ 70) ve sonrası hostingte yok → yeni yayin.zip gerekecek. Hostingten `dbtest.php` ve kökteki eski `yayin.zip` silinmeli (hatırlat).
+
+**Test hesabı:** yerel db'de `test3` / `test33` (gerçek oyuncu değil; işi bitince silinebilir). Testler: scratchpad `pt/` (shot.mjs + çeşitli *_check.mjs); JS sözdizimi denetimi için `node --check` yetmiyor → `import('file:///…')` ile ayrıştır.
+
+**Sıradaki olası işler:** yeni park oyunları (iki araba arası park, yağmurlu/kaygan, açılı park + hizalama), kartlara gerçek ekran görüntüleri, sol üst "M büyük harita" yazısı, başlık ekranında "Keşif yap / Oyuna başla" düğmeleri (konuşulmuştu), performans (çevre haritası yenilemesi ve müzik zamanlayıcısı ara sıra takılma yapıyor), mobil uygulama (rafa kaldırıldı).
+
+## (Önceki) KALDIĞIMIZ YER (2026-11-25 akşam)
 **Yarın yapılacaklar (kullanıcı istedi):**
 1. **Ana sayfadaki 3 ekran görüntüsü güncellenecek** (`img/palmera.jpg`, `wildwest.jpg`, `casablanca.jpg`; 960×540 JPG). Şimdikiler çizgi film görünümünden, beyaz arabadan, sarı kumdan, Casablanca renklerinden ÖNCE çekildi. Çekim: scratchpad `pt/shot.mjs` + yardımcı `snap(px,py,pz,lx,ly,lz)` (g.paused = true yapmalı, yoksa oyun döngüsü kamerayı ezer), `hideMk()` görev işaretlerini gizler.
 2. **Mobil uygulama** için konuşulacak — kullanıcı fikir almak istiyor (kod yazma, önce tartış).
