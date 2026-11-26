@@ -31,6 +31,18 @@ export function bowMesh() {
   g.add(bx(0.008, 0.008, 1.24, STRING, 0, 0, 0));          // kiriş
   return g;
 }
+// altıpatlar (Banka Soygunu görevi): kabza başlangıcı (0,0,0), namlu +Z yönünde (~0,32 m), silindir ortada
+const GUNMETAL = mat('#3a3d42', { r: 0.35, m: 0.8 });
+export function revolverMesh() {
+  const g = new THREE.Group();
+  const grip = bx(0.045, 0.12, 0.05, GRIP, 0, -0.03, -0.02, 0.35); g.add(grip);
+  g.add(bx(0.05, 0.06, 0.12, GUNMETAL, 0, 0.04, 0.06));                      // gövde
+  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.07, 6).rotateX(Math.PI / 2), GUNMETAL);
+  cyl.position.set(0, 0.04, 0.1); cyl.castShadow = true; g.add(cyl);           // silindir
+  g.add(bx(0.022, 0.022, 0.2, GUNMETAL, 0, 0.055, 0.22));                    // namlu
+  g.add(bx(0.012, 0.03, 0.04, GOLD, 0, 0.0, 0.07));                          // tetik korkuluğu
+  return g;
+}
 // ok: uç +Z'de (z = 0,5), boy ~1 m; tüyler parlak kırmızı/beyaz (uzaktan görünsün)
 function arrowGeometry() {
   const parts = [
@@ -52,7 +64,7 @@ function arrowGeometry() {
 
 // Ok engeli: binalar/kutular tam, ağaç ve kayaların çarpışma dairesinin yalnız iç yarısı.
 // (Ağaç daireleri yürürken yapraklara girilmesin diye geniş; oklar o geniş alana takılırsa ormanda hiç isabet olmuyordu.)
-function hitsObstacle(w, x, y, z) {
+export function hitsObstacle(w, x, y, z) {
   const cell = w.grid.get(Math.floor(x / w.CELL) * 10007 + Math.floor(z / w.CELL));
   if (!cell) return false;
   for (const bi of cell.b) {
@@ -86,6 +98,10 @@ export class Arrows {
     const ch = this.cross = document.createElement('div');
     ch.style.cssText = 'position:fixed;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border:2px solid rgba(255,255,255,.85);border-radius:50%;box-shadow:0 0 4px #000;pointer-events:none;display:none;z-index:5';
     document.body.appendChild(ch);
+    // altıpatlar seçiliyken nişangâhın altında kalan mermi
+    const am = this.ammoEl = document.createElement('div');
+    am.style.cssText = 'position:fixed;left:50%;top:50%;margin:14px 0 0 -40px;width:80px;text-align:center;font:700 15px Georgia,serif;color:#ffe9b0;text-shadow:0 0 3px #000,0 0 6px #000;pointer-events:none;display:none;z-index:5';
+    document.body.appendChild(am);
     this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._z = new THREE.Vector3(0, 0, 1); this._d = new THREE.Vector3(); this._s = new THREE.Vector3(1, 1, 1);
   }
   // dir: hedefe giden vektör; compensate: yerçekimi düşüşü kadar yukarı nişan al (hedefe tam varsın)
@@ -97,7 +113,12 @@ export class Arrows {
   }
   update(dt, game) {
     const P = game.player;
-    this.cross.style.display = P.weapon === 'bow' && !P.vehicle && !P.dead && game.state === 'play' ? 'block' : 'none';
+    const live = !P.dead && game.state === 'play';
+    // altıpatlar: yayan ve at üstünde nişan alınır
+    const gun = live && P.weapon === 'gun' && (!P.vehicle || P.vehicle.type === 'horse');
+    this.cross.style.display = (P.weapon === 'bow' && !P.vehicle && live) || gun ? 'block' : 'none';
+    this.ammoEl.style.display = gun ? 'block' : 'none';
+    if (gun) { const t = '● '.repeat(P.ammo) + '○ '.repeat(Math.max(0, 6 - P.ammo)); if (this.ammoEl.textContent !== t) this.ammoEl.textContent = t; }
     const W = game.world.wildlife, w = game.world;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const a = this.list[i];

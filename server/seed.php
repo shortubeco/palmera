@@ -55,6 +55,47 @@ function seedBots(PDO $pdo, int $seed = 2026): int {
 
 function deleteBots(PDO $pdo): int { return $pdo->exec('DELETE FROM players WHERE bot'); }
 
+// Drift Park sıralamaları boş görünmesin: botların bir kısmına her park oyununda rekor (kurallara uygun, çok iyiler az).
+// Üç rekor ayrı denemelerden gelmiş gibi: en kısa süre, en yüksek toplam (o denemenin süre + ortalama − ceza), en iyi park.
+function seedParkBots(PDO $pdo, int $seed = 7171, bool $all = false, ?array $only = null): int {   // $only: yalnız bu park oyunları   // $all: rekoru olan park oyunlarını da doldur (bot yenileme aracı)
+    mt_srand($seed);
+    $rnd = fn(): float => mt_rand() / mt_getrandmax();
+    $bots = $pdo->query('SELECT id, EXTRACT(EPOCH FROM (now() - last_seen))::int AS seen FROM players WHERE bot ORDER BY id')->fetchAll();
+    if (!$bots) return 0;
+    $ins = $pdo->prepare('INSERT INTO park_best (player_id, park, time_ms, time_at, total, total_at, park_score, park_at)
+                          VALUES (?, ?, ?, now() - make_interval(secs => ?), ?, now() - make_interval(secs => ?), ?, now() - make_interval(secs => ?))
+                          ON CONFLICT DO NOTHING');
+    $made = 0;
+    $pdo->beginTransaction();
+    $have = array_map('intval', $pdo->query('SELECT DISTINCT park FROM park_best')->fetchAll(PDO::FETCH_COLUMN));
+    foreach (PARKS + TEST_PARKS as $park => $P) {   // test bölümleri de örnek veri alır
+        if ($only !== null && !in_array($park, $only, true)) continue;
+        if (!$all && in_array($park, $have, true)) continue;   // bu park oyununda zaten rekor var (gerçek oyuncu ya da bot)
+        foreach ($bots as $b) {
+            if ($rnd() > 0.45) continue;   // botların yaklaşık yarısı bu park oyununu oynamış
+            $align = $P['align'];
+            $ago = fn() => (int) ($b['seen'] + 86400 * 20 * $rnd());
+            // en kısa süre: fast'ın biraz üstünden, çoğu orta hızda
+            $bestT = $P['fast'] + 0.3 + ($P['zero'] - $P['fast']) * 0.55 * $rnd() ** 1.6;
+            $ms = (int) round($bestT * 100) * 10;
+            // en iyi park puanı (ortalama [+ hizalama]): çoğu 40–85, birkaç çok iyi
+            $center = (int) round(30 + 67 * $rnd() ** 0.8);
+            $alignS = $align ? (int) round(35 + 62 * $rnd() ** 0.8) : 0;
+            $parkScore = $center + $alignS;
+            // en yüksek toplam: süresi en iyi süreden biraz yavaş, ortalaması en iyiden biraz düşük, bazen ceza
+            $t2 = $bestT + 1.5 * $rnd();
+            $c2 = max(0, $center - (int) round(15 * $rnd()));
+            $a2 = $align ? max(0, $alignS - (int) round(15 * $rnd())) : 0;
+            $pen = $rnd() < 0.25 ? 10 : 0;
+            $total = max(0, parkTimeScore($park, (int) round($t2 * 1000)) + $c2 + $a2 - $pen);
+            $ins->execute([$b['id'], $park, $ms, $ago(), $total, $ago(), $parkScore, $ago()]);
+            $made++;
+        }
+    }
+    $pdo->commit();
+    return $made;
+}
+
 // gerçekçi kullanıcı adları: oyuncu takma adları, isim + rakam, İngilizce rumuzlar (tekrar yok)
 function botNames(int $n, callable $rnd): array {
     $pick = fn(array $a) => $a[(int) ($rnd() * count($a))];

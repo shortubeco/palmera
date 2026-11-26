@@ -1,5 +1,5 @@
 <?php
-// Palmera City — lig API'si (JSON). Para ve süreyi sunucu hesaplar; tarayıcı yalnız "görev başladı / bitti" der.
+// Grand Drift Park — lig API'si (JSON). Para ve süreyi sunucu hesaplar; tarayıcı yalnız "görev başladı / bitti" der.
 declare(strict_types=1);
 require __DIR__ . '/server/db.php';
 
@@ -21,6 +21,19 @@ try {
             $l = (int) ($_GET['league'] ?? 1);
             if (!isset(LEAGUES[$l])) fail('Böyle bir lig yok.');
             out(['ok' => true] + leagueBoards($l));
+        }
+        if ($a === 'pboard') {   // Drift Park: bir park oyununun üç sıralaması
+            $park = (int) ($_GET['park'] ?? 0);
+            if (!isset(PARKS[$park])) fail('Böyle bir park oyunu yok.');
+            out(['ok' => true, 'parkId' => $park] + parkBoards($park));   // 'park' anahtarı en iyi park tablosunun
+        }
+        if ($a === 'pme') {      // Drift Park: oyuncunun her park oyunundaki rekorları + sıraları (ESC penceresi)
+            $pid = currentPlayerId();
+            if (!$pid) fail('Giriş yapılmadı.', 401);
+            $parks = [];
+            foreach (PARKS as $i => $P) $parks[$i] = playerPark($pid, $i);
+            $st = $pdo->prepare('SELECT username FROM players WHERE id = ?'); $st->execute([$pid]);
+            out(['ok' => true, 'username' => (string) $st->fetchColumn(), 'parks' => $parks]);
         }
         if ($a === 'me') {
             $pid = currentPlayerId();
@@ -163,6 +176,67 @@ try {
             $r = $st->fetch();
             $pdo->prepare('INSERT INTO money_log (player_id, delta, reason) VALUES (?, ?, ?)')->execute([$pid, (int) $r['money'] - (int) $r['old'], $reason]);
             out(['ok' => true, 'money' => (int) $r['money']]);
+        }
+
+        // ---------- Drift Park ----------
+        case 'pstart': {  // park denemesi başladı (geri sayım bitince); önceki yarım deneme bırakılmış sayılır
+            $park = (int) ($in['park'] ?? 0);
+            if (!isset(PARKS[$park])) fail('Böyle bir park oyunu yok.');
+            $pdo->prepare("UPDATE park_runs SET ended_at = now(), result = 'abandon' WHERE player_id = ? AND ended_at IS NULL")->execute([$pid]);
+            $st = $pdo->prepare('INSERT INTO park_runs (player_id, park) VALUES (?, ?) RETURNING id');
+            $st->execute([$pid, $park]);
+            out(['ok' => true, 'id' => (int) $st->fetchColumn()]);
+        }
+
+        case 'pfinish': { // park edildi: süreyi denetle, süre puanı ve toplamı sunucu hesaplar, üç rekoru güncelle
+            $id = (int) ($in['id'] ?? 0);
+            $ms = (int) ($in['ms'] ?? 0);
+            $center = (int) ($in['center'] ?? -1);
+            $alignIn = (int) ($in['align'] ?? 0);
+            $penalty = (int) ($in['penalty'] ?? -1);
+            $pdo->beginTransaction();
+            $at = $pdo->prepare('SELECT park, EXTRACT(EPOCH FROM (clock_timestamp() - started_at)) * 1000 AS server_ms
+                                 FROM park_runs WHERE id = ? AND player_id = ? AND ended_at IS NULL FOR UPDATE');
+            $at->execute([$id, $pid]);
+            $run = $at->fetch();
+            if (!$run) { $pdo->rollBack(); fail('Deneme kaydı bulunamadı (yeni bir deneme başlatılmış olabilir).'); }
+            $park = (int) $run['park']; $P = PARKS[$park];
+            $reject = function (string $why) use ($pdo, $id, $ms) {
+                $pdo->prepare("UPDATE park_runs SET ended_at = now(), result = 'rejected', time_ms = ? WHERE id = ?")->execute([$ms, $id]);
+                $pdo->commit();
+                fail($why);
+            };
+            // oyun içi süre sunucunun ölçtüğünden uzun olamaz, makul en kısa süreden kısa olamaz
+            if ($ms < $P['min'] * 1000 || $ms > (float) $run['server_ms'] + 3000) $reject('Süre geçersiz sayıldı.');
+            // puanlar 0–100; ceza yalnız 10/25/50'lerin toplamı olabilir (5'in katı)
+            if ($center < 0 || $center > 100 || $alignIn < 0 || $alignIn > 100 || $penalty < 0 || $penalty > 1000 || $penalty % 5) $reject('Puanlar geçersiz sayıldı.');
+            $align = $P['align'] ? $alignIn : 0;
+            $timeScore = parkTimeScore($park, $ms);
+            $total = max(0, $timeScore + $align + $center - $penalty);
+            $parkScore = $align + $center;
+            $pdo->prepare("UPDATE park_runs SET ended_at = now(), result = 'done', time_ms = ?, time_score = ?, center = ?, align = ?, penalty = ?, total = ?, park_score = ? WHERE id = ?")
+                ->execute([$ms, $timeScore, $center, $align, $penalty, $total, $parkScore, $id]);
+            // üç rekor ayrı ayrı: en kısa süre, en yüksek toplam, en iyi park
+            $b = $pdo->prepare('SELECT time_ms, total, park_score FROM park_best WHERE player_id = ? AND park = ? FOR UPDATE');
+            $b->execute([$pid, $park]);
+            $prev = $b->fetch();
+            $new = ['time' => !$prev || $ms < (int) $prev['time_ms'], 'total' => !$prev || $total > (int) $prev['total'], 'park' => !$prev || $parkScore > (int) $prev['park_score']];
+            if (!$prev) {
+                $pdo->prepare('INSERT INTO park_best (player_id, park, time_ms, total, park_score) VALUES (?, ?, ?, ?, ?)')->execute([$pid, $park, $ms, $total, $parkScore]);
+            } else {
+                if ($new['time']) $pdo->prepare('UPDATE park_best SET time_ms = ?, time_at = now() WHERE player_id = ? AND park = ?')->execute([$ms, $pid, $park]);
+                if ($new['total']) $pdo->prepare('UPDATE park_best SET total = ?, total_at = now() WHERE player_id = ? AND park = ?')->execute([$total, $pid, $park]);
+                if ($new['park']) $pdo->prepare('UPDATE park_best SET park_score = ?, park_at = now() WHERE player_id = ? AND park = ?')->execute([$parkScore, $pid, $park]);
+            }
+            $pdo->commit();
+            out(['ok' => true, 'timeMs' => $ms, 'timeScore' => $timeScore, 'align' => $align, 'center' => $center, 'penalty' => $penalty,
+                 'total' => $total, 'park' => $parkScore, 'newBest' => $new, 'best' => playerPark($pid, $park)]);
+        }
+
+        case 'pfail': {   // park edilemedi (park yerini geçti, dışarıda durdu, araçtan indi…)
+            $pdo->prepare("UPDATE park_runs SET ended_at = now(), result = 'failed' WHERE id = ? AND player_id = ? AND ended_at IS NULL")
+                ->execute([(int) ($in['id'] ?? 0), $pid]);
+            out(['ok' => true]);
         }
 
         case 'city': {    // oyuncu başka şehirde kalırsa sonraki açılışta orada devam eder

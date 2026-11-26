@@ -6,6 +6,15 @@ const FALLBACK = {
   'nature.json': 3e4, 'nature.bin': 6e6, 'animals.json': 2.5e6, 'west.bin': 4.2e6, 'west_chars.json': 1.2e6,
 };
 const files = {};
+
+// assets/web altındaki dosyanın adresine sürüm ekle (oyun.php window.ASSET_VER: dosya değişme zamanı).
+// Bu dosyalar 1 yıl önbellekte tutulur (assets/web/.htaccess); dosya değişince adres değişir, yeni hali iner.
+const VER = (typeof window !== 'undefined' && window.ASSET_VER) || {};
+export function assetUrl(url) {
+  const i = url.indexOf('assets/web/'); if (i < 0 || /[?&]v=/.test(url)) return url;
+  const v = VER[url.slice(i + 11).split('?')[0]];
+  return v ? url + (url.includes('?') ? '&' : '?') + 'v=' + v : url;
+}
 const nameOf = (url) => url.split('?')[0].split('/').pop();
 const expected = (n) => SIZES[n] || FALLBACK[n] || 1e6;
 
@@ -13,7 +22,7 @@ const expected = (n) => SIZES[n] || FALLBACK[n] || 1e6;
 export function trackedFetch(url) {
   const n = nameOf(url);
   const f = files[n] = { got: 0, total: expected(n), done: false };
-  return fetch(url).then(async (r) => {
+  return fetch(assetUrl(url)).then(async (r) => {
     if (!r.ok || !r.body || !r.body.getReader) { f.done = true; return r; }
     const reader = r.body.getReader(), chunks = [];
     for (;;) {

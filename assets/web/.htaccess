@@ -1,0 +1,10 @@
+# Oyun verileri (modeller, dokular): 1 yıl tarayıcı önbelleğinde.
+# Oyun bu dosyaları her zaman sürümlü adresle ister (oyun.php ASSET_VER → ?v=değişme zamanı);
+# dosya değişince adres değişir, yeni hali iner. Yerel php -S bu dosyayı okumaz (yalnız hosting: Apache/LiteSpeed).
+<IfModule mod_headers.c>
+  Header set Cache-Control "public, max-age=31536000, immutable"
+</IfModule>
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresDefault "access plus 1 year"
+</IfModule>

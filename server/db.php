@@ -1,12 +1,12 @@
 <?php
-// Palmera City — lig sistemi: veritabanı bağlantısı, tablolar, lig kuralları (öneriler.md).
+// Grand Drift Park — lig sistemi: veritabanı bağlantısı, tablolar, lig kuralları (öneriler.md).
 // Ayarlar: proje kökündeki config.local.php (yayın paketine girmez; hostingte elle oluşturulur).
 declare(strict_types=1);
 
 // lig kuralları: geçme sınırı, görev başındaki ödül, saniyede kesinti, görev (yoksa "yakında"), en kısa makul süre (sn)
 const LEAGUES = [
     1 => ['name' => 'Tahta',  'limit' => 100000,  'start' => 15000,  'decay' => 50,  'mission' => 'steal', 'min' => 20],
-    2 => ['name' => 'Demir',  'limit' => 250000,  'start' => 25000,  'decay' => 60,  'mission' => null,    'min' => 30],
+    2 => ['name' => 'Demir',  'limit' => 250000,  'start' => 25000,  'decay' => 60,  'mission' => 'heist', 'min' => 60],
     3 => ['name' => 'Bakır',  'limit' => 500000,  'start' => 40000,  'decay' => 80,  'mission' => null,    'min' => 30],
     4 => ['name' => 'Gümüş',  'limit' => 1000000, 'start' => 60000,  'decay' => 100, 'mission' => null,    'min' => 30],
     5 => ['name' => 'Altın',  'limit' => 2000000, 'start' => 100000, 'decay' => 150, 'mission' => null,    'min' => 30],
@@ -24,6 +24,27 @@ const CITIES = ['palmera', 'casablanca'];
 
 function missionKey(int $league, int $stage): string { return $league === LAST_LEAGUE ? "L7-$stage" : "L$league"; }
 
+// ---------- Drift Park: park oyunları (puan kuralları burada; yerleşim js/drift.js PARKS, aynı id) ----------
+// fast: bu sürede ya da daha hızlı süre puanı 100; zero: bu sürede ve sonrasında 0 (arası doğrusal)
+// align: hizalama puanı var mı (yoksa toplam = süre + ortalama − ceza, en iyi park = ortalama); min: en kısa makul süre (sn); route: kart tarifi
+const PARKS = [
+    1 => ['title' => 'Virajsız Park',  'level' => 'Kolay', 'fast' => 7.5, 'zero' => 20, 'align' => false, 'min' => 5, 'route' => 'Dümdüz cadde, park yeri sağ şeritte'],
+    2 => ['title' => 'Tek Viraj',      'level' => 'Orta',  'fast' => 15,  'zero' => 35, 'align' => false, 'min' => 9, 'route' => 'Kavşakta sağa dön, 200 m sonra park et · 2 el freni'],
+    3 => ['title' => '2 Viraj',        'level' => 'Zor',   'fast' => 22,  'zero' => 48, 'align' => false, 'min' => 13, 'route' => 'İkinci kavşakta sola, 2 sokak sonra sağa dön, 3 sokak sonra park et · 3 el freni'],
+];
+// landing'deki henüz oyunu olmayan rekor bölümleri (oynanamaz; yalnız bot örnek verisi). Gerçek oyun eklenince numarası buradan çıkar.
+const TEST_PARKS = [
+    4 => ['title' => 'Test 1', 'level' => 'Kolay', 'fast' => 10, 'zero' => 30, 'align' => false],
+    5 => ['title' => 'Test 2', 'level' => 'Orta',  'fast' => 14, 'zero' => 36, 'align' => false],
+    6 => ['title' => 'Test 3', 'level' => 'Zor',   'fast' => 18, 'zero' => 42, 'align' => false],
+    7 => ['title' => 'Test 4', 'level' => 'Zor',   'fast' => 22, 'zero' => 48, 'align' => false],
+];
+function parkTimeScore(int $park, int $ms): int {
+    $P = PARKS[$park] ?? TEST_PARKS[$park];
+    $k = ($P['zero'] - $ms / 1000) / ($P['zero'] - $P['fast']);
+    return (int) round(100 * max(0, min(1, $k)));
+}
+
 function db(): PDO {
     static $pdo = null;
     if ($pdo) return $pdo;
@@ -39,7 +60,89 @@ function db(): PDO {
         require_once __DIR__ . '/seed.php';
         seedBots($pdo);   // yeni kurulumda (hosting) tablolar boş görünmesin
     }
+    // Drift Park tabloları: eski kurulumlarda yoksa ilk açılışta kurulur; yeni eklenen park oyunlarına da botlar rekor alır
+    if (!$pdo->query("SELECT to_regclass('public.park_best')")->fetchColumn()) createParkTables($pdo);
+    $have = $pdo->query('SELECT DISTINCT park FROM park_best')->fetchAll(PDO::FETCH_COLUMN);
+    if (array_diff(array_keys(PARKS + TEST_PARKS), array_map('intval', $have))) {
+        require_once __DIR__ . '/seed.php';
+        seedParkBots($pdo);   // yalnız hiç rekoru olmayan park oyunlarına
+    }
     return $pdo;
+}
+
+function createParkTables(PDO $pdo): void {
+    $pdo->exec(<<<SQL
+CREATE TABLE IF NOT EXISTS park_runs (
+  id          BIGSERIAL PRIMARY KEY,
+  player_id   INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  park        SMALLINT NOT NULL,
+  started_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ended_at    TIMESTAMPTZ,
+  result      VARCHAR(10),
+  time_ms     INT,
+  time_score  SMALLINT,
+  center      SMALLINT,
+  align       SMALLINT,
+  penalty     SMALLINT,
+  total       SMALLINT,
+  park_score  SMALLINT
+);
+CREATE INDEX IF NOT EXISTS park_runs_player ON park_runs (player_id, id DESC);
+CREATE TABLE IF NOT EXISTS park_best (
+  player_id   INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  park        SMALLINT NOT NULL,
+  time_ms     INT NOT NULL,
+  time_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  total       SMALLINT NOT NULL,
+  total_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  park_score  SMALLINT NOT NULL,
+  park_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (player_id, park)
+);
+CREATE INDEX IF NOT EXISTS park_best_time ON park_best (park, time_ms);
+CREATE INDEX IF NOT EXISTS park_best_total ON park_best (park, total DESC);
+CREATE INDEX IF NOT EXISTS park_best_score ON park_best (park, park_score DESC);
+SQL);
+}
+
+// bir park oyununun üç sıralaması (en kısa süre, en yüksek toplam puan, en iyi park puanı), ilk $n
+function parkBoards(int $park, int $n = 20): array {
+    $pdo = db();
+    $q = function (string $cols, string $order) use ($pdo, $park, $n) {
+        $st = $pdo->prepare("SELECT p.username, $cols FROM park_best b JOIN players p ON p.id = b.player_id WHERE b.park = ? ORDER BY $order LIMIT " . (int) $n);
+        $st->execute([$park]);
+        return $st->fetchAll();
+    };
+    return [
+        'time'  => $q('b.time_ms', 'b.time_ms ASC, b.time_at ASC'),
+        'total' => $q('b.total', 'b.total DESC, b.total_at ASC'),
+        'park'  => $q('b.park_score', 'b.park_score DESC, b.park_at ASC'),
+    ];
+}
+// oyuncunun bir park oyunundaki rekorları ve sıraları (sonuç paneli); hiç bitirmediyse null
+function playerPark(int $pid, int $park): ?array {
+    $pdo = db();
+    $st = $pdo->prepare('SELECT time_ms, total, park_score FROM park_best WHERE player_id = ? AND park = ?');
+    $st->execute([$pid, $park]);
+    $b = $st->fetch();
+    if (!$b) return null;
+    $rank = function (string $cond, $v) use ($pdo, $park) {
+        $r = $pdo->prepare("SELECT 1 + COUNT(*) FROM park_best WHERE park = ? AND $cond");
+        $r->execute([$park, $v]);
+        return (int) $r->fetchColumn();
+    };
+    $n = $pdo->prepare('SELECT COUNT(*) FROM park_best WHERE park = ?');
+    $n->execute([$park]);
+    return [
+        'timeMs' => (int) $b['time_ms'], 'total' => (int) $b['total'], 'park' => (int) $b['park_score'],
+        'timeRank' => $rank('time_ms < ?', $b['time_ms']), 'totalRank' => $rank('total > ?', $b['total']), 'parkRank' => $rank('park_score > ?', $b['park_score']),
+        'players' => (int) $n->fetchColumn(),
+    ];
+}
+function parksForClient(): array {
+    $out = [];
+    foreach (PARKS as $i => $P) $out[$i] = $P + ['id' => $i];
+    return $out;
 }
 
 function createTables(PDO $pdo): void {

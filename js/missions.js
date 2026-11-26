@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { WATER_Y } from './world.js';
 import { formatMoney } from './util.js';
 import { fmtTime, LEAGUES, SIDE_REWARD } from './league.js';
+import { HeistMission } from './heist.js';
 
 function beamMesh(color, radius = 1.6, height = 60) {
   const g = new THREE.Group();
@@ -40,6 +41,9 @@ function labelSprite(m, sub) {
 export const MISSIONS = [
   { id: 'steal', kind: 'league', name: 'Altın Veloce', giver: 'Lola', start: { x: 192, z: -150 }, color: '#ff2fa8',
     intro: 'Altın Veloce GT\'yi çal ve limana getir. Küçük haritadaki sarı çizgiyi takip et.' },
+  // Demir ligi: Wild West, Puente Oeste'nin kasaba ucunda (at durağının karşısı); west: işaret Wild West'teyken görünür
+  { id: 'heist', kind: 'league', name: 'Banka Soygunu', giver: 'Kara Jack', start: { x: -724, z: -50 }, color: '#ffb020', west: true,
+    intro: 'Ata bin ve otele git. Otelde barda duran adamı yumruklarınla etkisiz hale getir ve silahını al. Silahla bankayı soy: banka kasasına gir ve paraları al. Sonra küçük haritadaki sarı çizgiyi takip et.' },
   { id: 'escape', kind: 'side', name: 'Mavi Işıklar', giver: 'Rico', start: { x: -100, z: -31 }, color: '#2f7bff',
     intro: 'Rico: "Polis telsizini dinledim, adını biliyorlar. Üç yıldızla başla ve onları ek — saklan, ara sokaklara dal, görüş alanından çık."' },
   { id: 'delivery', kind: 'side', name: 'Sıcak Paket', giver: 'Mama Tess', start: { x: -260, z: 47 }, color: '#ffb000',
@@ -48,13 +52,17 @@ export const MISSIONS = [
     intro: 'Kaptan Ruiz: "Marlin\'e atla, şamandıraları sırayla geç ve kumsal iskelesine yanaş. Sahil güvenlik uyanmadan bitir!"' },
 ];
 
+// Görevler kapalı (2026-11-26, kullanıcı: "bütün görevleri kaldır, kafa karıştırmasın" — oyun artık Drift Park).
+// Kod duruyor; true yapılırsa işaretler ve görevler geri gelir. objective (Drift Park GPS'i) bundan bağımsız çalışır.
+const MISSIONS_ON = false;
+
 export class Missions {
   constructor(game) {
     this.game = game;
     this.active = null;
     this.markers = [];
     this.run = null;   // süren görevin oyun içi süresi (duraklatma hariç) + lig ödülü
-    for (const m of MISSIONS) {
+    for (const m of (MISSIONS_ON ? MISSIONS : [])) {
       const b = beamMesh(m.color, 1.5, 45);
       const y = game.world.surfaceHeight(m.start.x, m.start.z);
       b.position.set(m.start.x, y, m.start.z);
@@ -80,7 +88,8 @@ export class Missions {
     const g = this.game, P = g.player;
     const t = g.time;
     for (const mk of this.markers) {
-      const on = !this.active && !g.cityHidden && this.available(mk.m);   // Isla Selva'dayken şehir işaretleri de gizli
+      // Palmera işaretleri şehirle birlikte gizlenir (Isla Selva, Wild West); Wild West işaretleri yalnız oradayken görünür
+      const on = !this.active && (mk.m.west ? g.westShown : !g.cityHidden) && this.available(mk.m);
       mk.mesh.visible = on;
       mk.mesh.userData.mat.opacity = 0.25 + Math.sin(t * 3) * 0.08;
       mk.mesh.rotation.y = t;
@@ -159,7 +168,7 @@ export class Missions {
     g.hud.mission(m.name + ' Görevi', m.intro);
     g.hud.big(m.name.toUpperCase(), 'Görev başladı', m.color, 2.5);
     g.audio?.jingle('start');
-    const ctor = { steal: StealMission, escape: EscapeMission, delivery: DeliveryMission, boat: BoatMission }[m.id];
+    const ctor = { steal: StealMission, heist: HeistMission, escape: EscapeMission, delivery: DeliveryMission, boat: BoatMission }[m.id];
     this.run = { t: 0, league: m.kind === 'league' ? LEAGUES[g.league.me.league] : null, reward: 0 };
     if (this.run.league) this.run.reward = this.run.league.start;
     g.league.startMission(m.kind, m.id);

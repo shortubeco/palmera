@@ -28,9 +28,12 @@ export const STATIONS = [
   { name: 'Radyo Kapalı', genre: 'off', bpm: 0 },
 ];
 
+const DRIFT_TRACK = { name: 'Drift Park', genre: 'drift', bpm: 116 };
+
 export class AudioSys {
   constructor(muted) {
     this.muted = muted; this.ctx = null; this.station = 0; this.radioOn = false;
+    this.musicMuted = false;   // müzik (radyo + Drift Park parçası) ayrı kapatılabilir; sesler çalmaya devam eder
     this.listener = { x: 0, y: 0, z: 0 };
     this.step = 0; this.nextTime = 0;
   }
@@ -44,7 +47,7 @@ export class AudioSys {
     this.radioBus = ctx.createGain(); this.radioBus.gain.value = 0; this.radioBus.connect(this.comp);
     this.radioFilter = ctx.createBiquadFilter(); this.radioFilter.type = 'lowpass'; this.radioFilter.frequency.value = 9000;
     this.radioFilter.connect(this.radioBus);
-    this.music = ctx.createGain(); this.music.gain.value = 0.55; this.music.connect(this.radioFilter);
+    this.music = ctx.createGain(); this.music.gain.value = this.musicMuted ? 0 : 0.55; this.music.connect(this.radioFilter);
     this.sfx = ctx.createGain(); this.sfx.gain.value = 0.9; this.sfx.connect(this.comp);
     // reverb
     const len = ctx.sampleRate * 2.2, ir = ctx.createBuffer(2, len, ctx.sampleRate);
@@ -95,8 +98,30 @@ export class AudioSys {
     this.rainN = loop('highpass', 2500, 0.5);
     this.windN = loop('lowpass', 500, 0.7);
     this.jetN = loop('bandpass', 700, 0.8);   // jet motoru (uçuş sahnesi)
+    // Drift Park müziği: distorsiyonlu gitar zinciri (dalga şekillendirici → bant → alçak geçiren → müzik)
+    this.gtrIn = ctx.createGain(); this.gtrIn.gain.value = 1;
+    const ws = ctx.createWaveShaper(), curve = new Float32Array(1024);
+    for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; curve[i] = Math.tanh(x * 6) * 0.8; }
+    ws.curve = curve; ws.oversample = '2x';
+    const gHp = ctx.createBiquadFilter(); gHp.type = 'highpass'; gHp.frequency.value = 90;
+    const gLp = ctx.createBiquadFilter(); gLp.type = 'lowpass'; gLp.frequency.value = 3200; gLp.Q.value = 0.8;
+    const gOut = ctx.createGain(); gOut.gain.value = 0.32;
+    this.gtrIn.connect(ws); ws.connect(gHp); gHp.connect(gLp); gLp.connect(gOut); gOut.connect(this.music);
+    const gRev = ctx.createGain(); gRev.gain.value = 0.18; gOut.connect(gRev); gRev.connect(this.revSend);
+    this.driftOn = false;
     this.timer = setInterval(() => this.schedule(), 25);
   }
+  // ---------- Drift Park müziği (özgün 80'ler otoyol rock'ı, 116 BPM, Mi minör) ----------
+  // setDrift(true): geri sayımda giriş (susturulmuş gitar + zil); driftGo(): "BAŞLA!" anında tam parça; setDrift(false): yavaşça sus
+  setDrift(on) {
+    if (!this.ctx) return;
+    this.driftOn = on;
+    if (on) { this.step = 0; this.nextTime = this.ctx.currentTime + 0.08; }
+    else { this.step = 0; }
+    const radio = this.radioOn && STATIONS[this.station].genre !== 'off';
+    this.radioBus.gain.setTargetAtTime(on || radio ? 0.5 : 0, this.ctx.currentTime, on ? 0.05 : 0.6);
+  }
+  driftGo() { if (this.ctx && this.driftOn) this.step = 32; }   // 3. ölçüden (tam parça) devam
   // jet uğultusu: k 0..1 (kalkışta güçlenir, perde yükselir); 0 → susar
   jet(k) {
     if (!this.jetN) return; const t = this.ctx.currentTime;
@@ -104,6 +129,10 @@ export class AudioSys {
     this.jetN.fl.frequency.setTargetAtTime(500 + k * 1400, t, 0.4);
   }
   resume() { this.ctx?.resume?.(); }
+  setMusicMuted(m) {
+    this.musicMuted = m;
+    if (this.music) this.music.gain.setTargetAtTime(m ? 0 : 0.55, this.ctx.currentTime, 0.1);
+  }
   setMasterMuted(m) { if (this.master) this.master.gain.value = m ? 0 : 0.8; }
 
   // ---------- konum ----------
@@ -116,14 +145,17 @@ export class AudioSys {
 
   // ---------- radyo ----------
   setRadio(on, station) {
-    if (station !== undefined) { this.station = station; this.step = 0; if (this.ctx) this.nextTime = this.ctx.currentTime + 0.08; }
+    if (station !== undefined) { this.station = station; if (!this.driftOn) { this.step = 0; if (this.ctx) this.nextTime = this.ctx.currentTime + 0.08; } }
     this.radioOn = on;
-    if (this.radioBus) this.radioBus.gain.setTargetAtTime(on && STATIONS[this.station].genre !== 'off' ? 0.5 : 0, this.ctx.currentTime, 0.15);
+    // Drift Park müziği çalarken radyo onu kesmez
+    if (this.radioBus) this.radioBus.gain.setTargetAtTime(this.driftOn || (on && STATIONS[this.station].genre !== 'off') ? 0.5 : 0, this.ctx.currentTime, 0.15);
   }
   nextStation(dir = 1) { const n = (this.station + dir + STATIONS.length) % STATIONS.length; this.setRadio(this.radioOn, n); return STATIONS[n]; }
   schedule() {
-    const ctx = this.ctx; if (!ctx || !this.radioOn) return;
-    const st = STATIONS[this.station]; if (st.genre === 'off') return;
+    const ctx = this.ctx; if (!ctx || this.musicMuted) return;   // müzik kapalıyken nota hiç üretilmez
+    // Drift Park müziği radyonun yerine çalar
+    const st = this.driftOn ? DRIFT_TRACK : (this.radioOn ? STATIONS[this.station] : null);
+    if (!st || st.genre === 'off') return;
     const dur = 60 / st.bpm / 4;
     if (this.nextTime < ctx.currentTime) this.nextTime = ctx.currentTime + 0.05;
     while (this.nextTime < ctx.currentTime + 0.15) {
@@ -175,6 +207,44 @@ export class AudioSys {
     this.osc('square', mtof(ch[arp[s % 4]] + 12 + (s >= 8 ? 12 : 0)), t, d * 0.9, 0.05, { lp: 2600, del: 0.5 });
     if (s === 0) for (const n of ch) { this.osc('sawtooth', mtof(n), t, d * 15, 0.045, { a: 0.4, lp: 1500, detune: 8, rev: 0.4, sus: 0.03 }); this.osc('sawtooth', mtof(n), t, d * 15, 0.045, { a: 0.4, lp: 1500, detune: -8, sus: 0.03 }); }
     if (bar === 3 && s === 14) this.snare(t, 0.25, 0.8);
+  }
+  // Drift Park: 4 ölçülük döngü Mi5 · Re5 · Do5 · Re5 (güç akorları); 0–1. ölçü giriş, sonra tam parça.
+  // Gitar: susturulmuş on altılık "çuğ" + vurgulu güç akoru vuruşları (distorsiyon zinciri gtrIn); bas sekizlik; büyük yankılı trampet.
+  // Melodi (özgün): her 8 ölçünün ikinci yarısında kısa bir synth cevabı.
+  drift(i, t, d) {
+    const roots = [40, 38, 36, 38];                 // Mi2, Re2, Do2, Re2
+    const bar = Math.floor(i / 16), s = i % 16, r = roots[bar % 4];
+    const intro = bar < 2, cyc = bar % 8;
+    const g = { out: this.gtrIn };
+    // gitar: susturulmuş çuğ (kısa, kapalı) — vurgularda açık güç akoru (kök + beşli + oktav)
+    const accent = [0, 3, 6, 10, 12].includes(s) || (cyc === 7 && s >= 12);
+    if (intro) {
+      if (s % 2 === 0) this.osc('sawtooth', mtof(r + 12), t, d * 0.45, 0.22, { lp: 900, ...g });
+    } else if (accent) {
+      for (const k of [0, 7, 12]) { this.osc('sawtooth', mtof(r + 12 + k), t, d * 1.8, 0.2, { lp: 2400, detune: 6, ...g }); this.osc('square', mtof(r + 12 + k), t, d * 1.8, 0.12, { lp: 1800, detune: -6, ...g }); }
+    } else {
+      this.osc('sawtooth', mtof(r + 12), t, d * 0.4, 0.18, { lp: 700, ...g });
+    }
+    // davul
+    if (intro) { if (s % 2 === 0) this.hat(t, 0.05); if (bar === 1 && s >= 12) this.snare(t, 0.18 + (s - 12) * 0.05, 0.5); return; }
+    if (s === 0 && cyc === 0) this.noise(t, 1.4, 0.16, 'highpass', 5000, { rev: 0.5 });   // zil (crash)
+    if (s === 0 || s === 8 || (s === 10 && bar % 2)) this.kick(t, 0.95);
+    if (s === 4 || s === 12) { this.snare(t, 0.5, 1.0); this.noise(t, 0.12, 0.2, 'bandpass', 900, { q: 0.7 }); }
+    if (s % 2 === 0) this.hat(t, s % 4 === 2 ? 0.08 : 0.05);
+    if (cyc === 7 && s >= 12) this.snare(t, 0.3 + (s - 12) * 0.06, 0.6);   // geçiş
+    // bas: sekizlik, ölçü sonunda bir sonraki köke kayar
+    if (s % 2 === 0) {
+      const nr = roots[(bar + 1) % 4], n = s === 14 && nr !== r ? r + (nr > r ? 1 : -1) : r;
+      this.osc('sawtooth', mtof(n), t, d * 1.6, 0.3, { lp: 520, lpEnd: 180, q: 3 });
+    }
+    // pad: ölçü başında
+    if (s === 0) for (const k of [12, 19, 24]) this.osc('sawtooth', mtof(r + k), t, d * 15, 0.03, { a: 0.3, lp: 1400, detune: 9, rev: 0.4, sus: 0.02 });
+    // melodi cevabı (ölçü 4–7 arası): Mi minör pentatonik
+    if (cyc >= 4) {
+      const mel = { 4: [[0, 71], [3, 74], [6, 76], [10, 74]], 5: [[0, 71], [6, 69], [10, 67]], 6: [[0, 67], [3, 69], [6, 71], [10, 74], [12, 76]], 7: [[0, 79], [4, 76], [8, 74]] }[cyc];
+      const hit = mel.find(([st]) => st === s);
+      if (hit) this.osc('square', mtof(hit[1]), t, d * 3, 0.06, { lp: 3000, del: 0.45, rev: 0.3, sus: 0.01 });
+    }
   }
   house(i, t, d) {
     const prog = [[53, 56, 60, 63], [51, 55, 58, 62], [49, 53, 56, 60], [48, 51, 55, 58]];

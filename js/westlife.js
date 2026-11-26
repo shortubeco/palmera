@@ -26,7 +26,7 @@ export async function loadCowboyKit(base = 'assets/web/') {
 const BONES = ['spine', 'chest', 'neck', 'head', 'upper_legL', 'lower_legL', 'footL', 'upper_legR', 'lower_legR', 'footR', 'upper_armL', 'lower_armL', 'upper_armR', 'lower_armR'];
 const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1), _q = new THREE.Quaternion();
 // karakterin X/Y/Z eksenlerini her kemiğin ebeveyn uzayına çevir (dinlenme pozunda, obje döndürülmeden önce)
-function rig(obj) {
+export function rig(obj) {
   obj.updateMatrixWorld(true);
   const b = {}; obj.traverse((o) => { if (o.isBone && !b[o.name]) b[o.name] = o; });
   const R = {};
@@ -44,7 +44,17 @@ function setBone(R, n, ax, a, ax2, a2) {
   if (ax) { _q.setFromAxisAngle(r[ax], a); r.bone.quaternion.premultiply(_q); }
 }
 // w: 0 duruş … 1 tam yürüyüş, ph: adım evresi, look: başın yana dönüşü, t: zaman (nefes)
-function pose(R, w, ph, look, t, sit = false) {
+// sit: true = sandalyede, 'ride' = at üstünde (bacaklar iki yana açık, sağ kol tabancayla öne uzanır; w = dörtnal zıplaması)
+export function pose(R, w, ph, look, t, sit = false) {
+  if (sit === 'ride') {
+    setBone(R, 'upper_legL', 'x', -1.25, 'z', -0.55); setBone(R, 'upper_legR', 'x', -1.25, 'z', 0.55);
+    setBone(R, 'lower_legL', 'x', 1.35); setBone(R, 'lower_legR', 'x', 1.35);
+    setBone(R, 'footL', 'x', 0); setBone(R, 'footR', 'x', 0);
+    setBone(R, 'upper_armL', 'x', -0.9, 'z', -0.9); setBone(R, 'lower_armL', 'x', -0.9);
+    setBone(R, 'upper_armR', 'x', -1.45, 'z', 1.0); setBone(R, 'lower_armR', 'x', -0.15);
+    setBone(R, 'spine', 'x', 0.12 + 0.05 * w * Math.sin(ph)); setBone(R, 'chest', 'y', 0.15); setBone(R, 'head', 'y', look);
+    return;
+  }
   if (sit) {
     // oturuş: uyluklar öne yatay, dizler bükük, kollar masaya uzanır
     setBone(R, 'upper_legL', 'x', -1.5); setBone(R, 'upper_legR', 'x', -1.5);
@@ -85,7 +95,7 @@ export class WestLife {
         const R = rig(obj);
         scene.add(obj);
         const p = this.walkPoint();
-        const c = { kind, obj, R, x: p[0], z: p[1], y: 0, heading: this.rnd() * 6.28, state: 'idle', timer: this.rnd() * 4, tx: p[0], tz: p[1], w: 0, ph: this.rnd() * 6, look: 0, stuck: 0, downT: 0, fall: 0 };
+        const c = { kind, obj, R, x: p[0], z: p[1], y: 0, heading: this.rnd() * 6.28, state: 'idle', timer: this.rnd() * 4, tx: p[0], tz: p[1], w: 0, ph: this.rnd() * 6, look: 0, stuck: 0, downT: 0, fall: 0, hp: 100, dead: false };
         c.y = this.world.surfaceHeight(c.x, c.z);
         this.cowboys.push(c);
       }
@@ -94,8 +104,8 @@ export class WestLife {
         const K = chars.kinds[f.kind]; if (!K) continue;
         const obj = cloneSkinned(K.root), R = rig(obj);
         scene.add(obj);
-        this.cowboys.push({ kind: f.kind, obj, R, x: f.x, z: f.z, y: west.hotel.y, heading: f.heading, home: f.heading, fixed: true, sit: !!f.sit,
-          state: 'idle', timer: 0, tx: f.x, tz: f.z, w: 0, ph: 0, look: 0, stuck: 0, downT: 0, fall: 0 });
+        this.cowboys.push({ kind: f.kind, id: f.id || null, obj, R, x: f.x, z: f.z, y: west.hotel.y, heading: f.heading, home: f.heading, fixed: true, sit: !!f.sit, sit0: !!f.sit,
+          state: 'idle', timer: 0, tx: f.x, tz: f.z, w: 0, ph: 0, look: 0, stuck: 0, downT: 0, fall: 0, hp: 100, dead: false });
       }
     }
     const H = animals?.kinds.horse;
@@ -136,6 +146,47 @@ export class WestLife {
     return [x0 + (x1 - x0) * t, z0 + (z1 - z0) * t];
   }
 
+  // ---------- dövüş: yumruk (3 yumrukta ölür), kurşun (2'de) ----------
+  // önündeki (1,7 m, ±66°) canlı kovboya yumruk; isabet ettiyse kovboyu döndürür
+  punch(pos, heading, game) {
+    const hx = Math.sin(heading), hz = Math.cos(heading);
+    let best = null, bd = 1.7;
+    for (const c of this.cowboys) {
+      if (c.dead || !c.obj.visible) continue;
+      const dx = c.x - pos.x, dz = c.z - pos.z, d = Math.hypot(dx, dz);
+      if (d < bd && Math.abs(c.y - pos.y) < 1.5 && (dx * hx + dz * hz) / (d || 1) > 0.4) { bd = d; best = c; }
+    }
+    if (best) this.damage(best, 34, game, hx, hz);
+    return best;
+  }
+  // ışın (o: başlangıç, d: birim yön) en yakın hangi kovboya değer: { t, c } ya da null (gövde: 0,45 m yarıçaplı küre)
+  rayHit(o, d, maxT = 80) {
+    let best = null;
+    for (const c of this.cowboys) {
+      if (c.dead || !c.obj.visible) continue;
+      const cx = c.x - o.x, cy = c.y + (c.sit ? 0.75 : 1.1) - o.y, cz = c.z - o.z;
+      const t = cx * d.x + cy * d.y + cz * d.z;
+      if (t < 0 || t > maxT) continue;
+      const px = cx - d.x * t, py = cy - d.y * t, pz = cz - d.z * t;
+      if (px * px + py * py * 0.35 + pz * pz < 0.45 * 0.45 && (!best || t < best.t)) best = { t, c };
+    }
+    return best;
+  }
+  damage(c, n, game, kx = 0, kz = 0) {
+    if (c.dead) return;
+    c.hp -= n; c.hitT = 0.35;
+    game.effects?.hit?.(c.x, c.y + 1.2, c.z);
+    if (!c.fixed) { c.x += kx * 0.25; c.z += kz * 0.25; }
+    if (c.hp <= 0) {
+      c.hp = 0; c.dead = true; c.sit = false; c.state = 'idle'; c.fall = 0;
+      pose(c.R, 0, 0, 0, 0);
+      this.onDeath?.(c);
+    }
+  }
+  revive(c) {
+    c.dead = false; c.hp = 100; c.fall = 0; c.hitT = 0; c.sit = !!c.sit0; c.heading = c.home ?? c.heading;
+  }
+
   update(dt, game) {
     const P = game.player, pp = P.vehicle ? P.vehicle.pos : P.pos, W = this.world, t = game.time;
     // salon kapıları: oyuncu (yayayken) ve yürüyen kovboylar iter
@@ -146,13 +197,21 @@ export class WestLife {
       const dP = Math.hypot(c.x - pp.x, c.z - pp.z);
       if (dP > 220) { c.obj.visible = false; continue; }
       c.obj.visible = true;
+      // ölü: yere yığılır, kalkmaz (görev yeniden başlarsa revive)
+      if (c.dead) {
+        c.fall = damp(c.fall, 1, 5, dt);
+        c.obj.position.set(c.x, c.y + c.fall * 0.15, c.z);
+        c.obj.rotation.set(-c.fall * Math.PI / 2, c.heading, 0, 'YXZ');
+        continue;
+      }
+      c.hitT = Math.max(0, (c.hitT || 0) - dt);
       if (c.fixed) {
         // yerinde: ayaktaysa yakındaki oyuncuya döner, sonra eski yönüne
         const nearF = dP < 3.5 && !P.vehicle && !c.sit;
         c.heading = dampAngle(c.heading, nearF ? Math.atan2(P.pos.x - c.x, P.pos.z - c.z) : c.home, 3, dt);
         if (dP < 90) pose(c.R, 0, 0, c.sit && dP < 4 ? 0.4 * Math.sin(t * 0.6) : 0, t + c.x, c.sit);
         c.obj.position.set(c.x, c.y - (c.sit ? 0.33 : 0), c.z);
-        c.obj.rotation.set(0, c.heading, 0);
+        c.obj.rotation.set(-c.hitT * 0.5, c.heading, 0, 'YXZ');   // darbe alınca geriye sarsılır
         continue;
       }
       // hızlı araç çarptı: yere düş, sonra kalk

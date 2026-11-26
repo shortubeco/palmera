@@ -101,20 +101,59 @@ export class League {
   }
 
   // ---------- arayüz ----------
+  // sağ üst rozet: Drift Park'ta park oyununun adı + zorluğu + oyuncunun o oyundaki en iyi puanı ve süresi; keşifte 'KEŞİF'
+  // (eski: lig adı + lig hedefi; para da kaldırıldı — Drift Park, 2026-11-26)
   updateBadge() {
     const el = $('leaguebadge'); if (!el) return;
-    el.innerHTML = `<b>${this.title.toLocaleUpperCase('tr')} LİGİ</b><small>hedef ${formatMoney(this.L.limit)}</small>`;
+    const D = this.g.drift, cfg = window.PARK_CFG || {};
+    if (D?.active && D.def) {
+      const P = cfg[D.def.id] || D.def, b = this.parkBest?.[D.def.id];
+      // başlığın altında iki satır: en yüksek puan, en iyi süre (saat bunların altında, #clockrow)
+      const pts = b ? b.total : '–', tm = b ? (b.timeMs / 1000).toFixed(2).replace('.', ',') : '–';
+      el.innerHTML = `<b>${esc(String(P.title).toLocaleUpperCase('tr'))}</b><small>En yüksek puan: ${pts}</small><small>En iyi süre: ${tm}</small>`;
+    } else el.innerHTML = '<b>KEŞİF</b><small>ESC → Diğer oyunlar</small>';
+  }
+  // oyuncunun park oyunu rekorları (rozet + Diğer oyunlar kartları); çevrimdışında yok
+  async refreshParks() {
+    if (this.offline) { this.updateBadge(); return; }
+    try {
+      const j = await (await fetch('lig.php?a=pme', { credentials: 'same-origin' })).json();
+      if (j.ok) this.parkBest = j.parks;
+    } catch (e) { /* bağlantı yok */ }
+    this.updateBadge();
   }
   // ESC penceresi: oyuncunun kendi sıralaması (açılınca sunucudan tazelenir)
+  // ESC penceresi: oyuncu + oynanan park oyunu; o oyundaki en yüksek puan ve en iyi süre (sıralarıyla).
+  // Keşifteyken her park oyunu tek satır. (Eski lig/para bilgisi kaldırıldı — Drift Park, 2026-11-26)
   async showRank() {
     const el = $('prank'); if (!el) return;
-    this.renderRank(el);
-    if (this.offline) return;
+    this.renderParks(el, this.parkBest || null);   // hemen doğru başlıkla (sunucu yanıtı gelince güncellenir)
+    if (this.offline) { this.renderParks(el, null); return; }
     try {
-      const r = await fetch('lig.php?a=me', { credentials: 'same-origin' });
+      const r = await fetch('lig.php?a=pme', { credentials: 'same-origin' });
       const j = await r.json();
-      if (j.ok) { this.applyMe(j.me); this.renderRank(el); }
-    } catch (e) { /* çevrimdışı: eldeki bilgi */ }
+      if (j.ok) { this.parkBest = j.parks; this.renderParks(el, j.parks); }
+    } catch (e) { /* bağlantı yok: eldeki bilgi */ }
+  }
+  renderParks(el, parks) {
+    const D = this.g.drift, cfg = window.PARK_CFG || {};
+    const sec = (ms) => (ms / 1000).toFixed(2).replace('.', ',') + ' sn';
+    const name = (id) => cfg[id] ? `${cfg[id].title} · ${cfg[id].level}` : `Park ${id}`;
+    const head = `<div class="pr-head">${esc(this.me.username)}${D?.active ? ` · <b>${esc(name(D.def.id))}</b>` : ' · <b>Keşif</b>'}${this.offline ? ' <i>(çevrimdışı test)</i>' : ''}</div>`;
+    if (this.offline) { el.innerHTML = head + '<div class="pr-note">Çevrimdışı test: puanlar kaydedilmiyor.</div>'; return; }
+    if (!parks) { el.innerHTML = head + '<div class="pr-note">Rekorlar yükleniyor…</div>'; return; }
+    if (D?.active) {
+      const b = parks[D.def.id];
+      el.innerHTML = head + (b
+        ? `<div class="pr-grid"><span>En yüksek puanın</span><b>${b.total} <i>(${b.totalRank}. / ${b.players})</i></b>` +
+          `<span>En iyi süren</span><b>${sec(b.timeMs)} <i>(${b.timeRank}. / ${b.players})</i></b></div>`
+        : '<div class="pr-note">Bu oyunda henüz park etmedin.</div>');
+      return;
+    }
+    el.innerHTML = head + '<div class="pr-grid">' + Object.keys(cfg).map((id) => {
+      const b = parks[id];
+      return `<span>${esc(name(id))}</span><b>${b ? `${b.total} puan · ${sec(b.timeMs)}` : '<i>henüz yok</i>'}</b>`;
+    }).join('') + '</div>';
   }
   renderRank(el) {
     const me = this.me, L = this.L;

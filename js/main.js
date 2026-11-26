@@ -1,4 +1,4 @@
-// Palmera City — ana oyun döngüsü
+// Grand Drift Park — ana oyun döngüsü
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -15,6 +15,7 @@ import { Traffic, Driver } from './traffic.js';
 import { Police } from './police.js';
 import { Player } from './player.js';
 import { Missions } from './missions.js';
+import { DriftPark } from './drift.js';
 import { HUD } from './hud.js';
 import { AudioSys, STATIONS } from './audio.js';
 import { loadBuildingKit } from './buildings.js';
@@ -22,7 +23,9 @@ import { loadNatureKit, isleDN, onFoot, FOOT } from './forest.js';
 import { loadAnimalKit } from './wildlife.js';
 import { loadWestKit, loadWestMeta, WBR, WEST_X, HORSE_SPOTS } from './west.js';
 import { Arrows } from './weapons.js';
-import { downloadProgress, setBar } from './progress.js';
+import { downloadProgress, setBar, assetUrl } from './progress.js';
+// dokular (three.js yükleyicileri) da sürümlü adresle iner (önbellek: assets/web/.htaccess)
+THREE.DefaultLoadingManager.setURLModifier(assetUrl);
 import { Flights, AIRPORTS, CASA } from './flight.js';
 import { League } from './league.js';
 
@@ -149,13 +152,14 @@ class Game {
     this.hud = new HUD(this);
     this.league.updateBadge();
     this.missions = new Missions(this);
+    this.drift = new DriftPark(this);   // Drift Park: park etme oyunu (js/drift.js)
     this.flights = new Flights(this);   // havaalanı: uçak + kalkış tabelası + uçuş sahnesi
     // başka şehirdeyken kapatıldıysa "OYNA" orada devam eder; "Palmera'dan başla" baştan (Palmera) açar
     const city = this.league.me.city;
     this.pendingCity = !params.get('pos') && city !== 'palmera' && AIRPORTS[city] ? city : null;
 
     // başlangıç araçları
-    this.addVehicle('sport', { x: 186.2, y: 0, z: 56, heading: Math.PI, color: '#d4d4cf' });
+    this.startCar = this.addVehicle('sport', { x: 186.2, y: 0, z: 56, heading: Math.PI, color: '#d4d4cf' });
     this.addVehicle('moto', { x: 186.4, y: 0, z: 66, heading: Math.PI, color: '#20c4ff' });
     this.lastCar = null;
 
@@ -195,6 +199,13 @@ class Game {
     const snd = $('sound');
     snd.checked = params.get('mute') !== '1' && localStorageGet('pn_sound') !== 'off';
     snd.addEventListener('change', () => localStorageSet('pn_sound', snd.checked ? 'on' : 'off'));
+    // müzik ayrı: kapalıysa radyo ve Drift Park parçası çalmaz, sesler çalar (tarayıcıda hatırlanır)
+    const mus = $('music');
+    mus.checked = localStorageGet('pn_music') !== 'off';
+    const applyMusic = (on) => { this.audio.musicMuted = !on; this.audio.setMusicMuted(!on); $('pmusic').textContent = on ? 'Müzik: Açık' : 'Müzik: Kapalı'; };
+    applyMusic(mus.checked);
+    mus.addEventListener('change', () => { localStorageSet('pn_music', mus.checked ? 'on' : 'off'); applyMusic(mus.checked); });
+    $('pmusic').addEventListener('click', () => { mus.checked = !mus.checked; localStorageSet('pn_music', mus.checked ? 'on' : 'off'); applyMusic(mus.checked); });
     $('play').addEventListener('click', () => { if (!snd.checked) this.audio.muted = true; this.start(); });
     // başka şehirde kalındıysa: OYNA orada devam eder, ikinci düğme Palmera'dan (oyunun başından) başlatır
     if (this.pendingCity) {
@@ -205,7 +216,12 @@ class Game {
     $('resume').addEventListener('click', () => this.setPaused(false));
     $('introX').addEventListener('click', () => this.closeIntro());
     $('introGo').addEventListener('click', () => this.closeIntro());
-    $('prestart').addEventListener('click', () => this.restartGame());
+    // Drift Park'tayken o park oyununun başına (Tekrar dene ile aynı), değilse başlangıç noktasına (arabanın içinde)
+    // (bu oturumda park oyunu oynandıysa — kapatılmış olsa da — o park oyununun başına; hiç oynanmadıysa Palmera başlangıcı)
+    // ESC → Diğer oyunlar: park oyunu kartları; seçince sayfa değişmeden (şehir yeniden yüklenmeden) o oyun başlar
+    $('pparks').addEventListener('click', () => this.showParkPick());
+    $('ppback').addEventListener('click', () => $('parkpick').classList.add('hidden'));
+    $('prestart').addEventListener('click', () => { if (this.drift.active || this.drift.lastId) { this.setPaused(false); this.drift.again(); } else this.restartGame(); });
     $('psound').addEventListener('click', () => { this.soundOff = !this.soundOff; this.audio.setMasterMuted(this.soundOff); $('psound').textContent = this.soundOff ? 'Ses: Kapalı' : 'Ses: Açık'; });
     document.addEventListener('pointerlockchange', () => {
       // oyunun kendi bıraktığı kilidin (bilet menüsü) olayı geç gelse de oyunu duraklatmasın
@@ -229,15 +245,22 @@ class Game {
       lines.push(`${A.title}'nde kaldığın yerden devam ediyorsun. Palmera'ya dönmek için kalkış tabelasından bilet al.`);
       this.pendingCity = null;
     } else {
+      // keşif de arabanın içinde başlar (yaya tuşları kaldırıldı); ?pos= testleri ve Drift Park hariç
+      if (!params.get('pos') && !params.get('park') && this.startCar) { this.player.enterVehicle(this.startCar); this.cam.yaw = this.startCar.heading; this._camInit = false; }
+      // keşif: şehirde serbest dolaşma (görevler kapalı); park oyunu ESC → Diğer oyunlar
+      lines.push(`Keşif modundasın: Palmera'da arabayla serbestçe dolaş, caddeleri ve park yerlerini tanı.`, `Bir park oyunu oynamak için ESC'ye bas ve "Diğer oyunlar"ı seç.`);
       const lg = this.league;
-      // Tahta ligi (görev Altın Veloce, işaret Ocean Drive'ın kuzeyinde): başlangıçtan yol tarifi (kullanıcı metni)
-      if (lg.me.league === 1 && lg.mission) lines.push(`Hedefin ${formatMoney(lg.L.limit)} toplamak. Önündeki beyaz arabaya bin ve caddeyi dümdüz takip et. Yolun sağında daire şeklinde bir ışık göreceksin. Arabadan inip dairenin içine gir ve E tuşuna bas. Görevin başlayacak.`);
-      else lines.push(lg.mission
+      // (eski lig/görev metinleri — görevler kapalıyken gösterilmez)
+      if (false) lines.push(`Hedefin ${formatMoney(lg.L.limit)} toplamak. Önündeki beyaz arabaya bin ve caddeyi dümdüz takip et. Yolun sağında daire şeklinde bir ışık göreceksin. Arabadan inip dairenin içine gir ve E tuşuna bas. Görevin başlayacak.`);
+      // Demir ligi (Banka Soygunu, Wild West): oyun Palmera'da başlar, oyuncu görev yerine kendisi gider
+      else if (false && lg.mission === 'heist') lines.push(`Hedefin ${formatMoney(lg.L.limit)} toplamak. Görevin batıdaki Wild West kasabasında. Arabayla otoyoldan batıya, Puente Oeste köprüsüne git. Köprü başında arabadan in, ata bin ve köprüyü geç. Köprünün kasaba ucundaki turuncu dairenin içine gir ve E tuşuna bas. Görevin başlayacak.`);
+      else if (false) lines.push(lg.mission
         ? `${lg.title} Ligi: hedefin ${formatMoney(lg.L.limit)}. Lig görevi ve yardım görevleri mini haritadaki renkli harfli yuvarlaklardır. Oraya git, ışık sütununun içine gir ve E'ye bas.`
         : `${lg.title} Ligi'nin görevi yakında eklenecek. Şimdilik yardım görevleriyle (${formatMoney(500)}) para kazanabilirsin.`);
     }
-    lines.push('F: araca bin/in · M: harita · ESC: menü ve tuşlar');
+    lines.push('M: büyük harita · ESC: menü ve tuşlar');
     // açıklamalar oyun başlamadan, imleç serbestken gösterilir; ✕ / BAŞLA (ya da Enter) ile kapanınca fare kilitlenir
+    if (params.get('park')) { this.closeIntro(); this.drift.begin(params.get('park')); return; }   // Drift Park (geçici açılış; başlık düğmeleri 3. adımda)
     if (params.get('autostart') === '1') { this.closeIntro(); return; }   // test: pencere yok
     $('introList').replaceChildren(...lines.map((t) => { const li = document.createElement('li'); li.textContent = t; return li; }));
     $('intro').classList.remove('hidden');
@@ -258,6 +281,7 @@ class Game {
     // duraklatan tuş basışı aynı anda devam ettirmesin
     if (p) { this.pausedAt = performance.now(); this.input.pressed.clear(); this.league.showRank(); }
     $('pause').classList.toggle('hidden', !p);
+    if (!p) $('parkpick').classList.add('hidden');   // oyun sürerken park oyunu penceresi açık kalmasın
     if (!p) { this.lock(); this.clock.getDelta(); }
     this.audio.ctx && (p ? this.audio.ctx.suspend() : this.audio.ctx.resume());
   }
@@ -283,6 +307,26 @@ class Game {
     this.scene.add(v.mesh); this.vehicles.push(v);
     v.update(0.0001, this);
     return v;
+  }
+  showParkPick() {
+    const cfg = window.PARK_CFG || {}, best = this.league.parkBest || {}, grid = $('ppgrid');
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const lv = { Kolay: 'easy', Orta: 'mid', Zor: 'hard' };
+    const cur = this.drift.active || this.drift.lastId ? this.drift.def?.id : null;
+    grid.innerHTML = Object.values(cfg).map((P) => {
+      const b = best[P.id];
+      const rec = b ? `En iyi: <b>${b.total} puan</b> · ${(b.timeMs / 1000).toFixed(2).replace('.', ',')} sn` : 'Henüz oynamadın';
+      return `<div class="pcard lv-${lv[P.level] || 'easy'}${P.id === cur ? ' now' : ''}" data-park="${P.id}">` +
+        `<div class="pimg"><span class="psun"></span><span class="proad"></span><span class="pspot"></span><span class="plevel">${esc(P.level)}</span><span class="ptitle">${esc(P.title)}</span></div>` +
+        `<div class="pinfo">${esc(P.route || '')}</div><div class="pbest">${P.id === cur ? 'Şu an oynuyorsun · ' : ''}${rec}</div><span class="pbtn">OYNA</span></div>`;
+    }).join('');
+    grid.querySelectorAll('.pcard').forEach((el) => el.addEventListener('click', () => {
+      $('parkpick').classList.add('hidden');
+      this.setPaused(false);
+      this.drift.hideResult();
+      this.drift.begin(Number(el.dataset.park));
+    }));
+    $('parkpick').classList.remove('hidden');
   }
   removeVehicle(v) {
     if (this.player.vehicle === v) return;
@@ -464,7 +508,7 @@ class Game {
     for (const s of this.world.parkingSpots) { s.vehicle = null; s.cooldown = 0; }
     for (const p of this.peds) p.dispose();
     this.peds.length = 0;
-    this.addVehicle('sport', { x: 186.2, y: 0, z: 56, heading: Math.PI, color: '#d4d4cf' });
+    this.startCar = this.addVehicle('sport', { x: 186.2, y: 0, z: 56, heading: Math.PI, color: '#d4d4cf' });
     this.addVehicle('moto', { x: 186.4, y: 0, z: 66, heading: Math.PI, color: '#20c4ff' });
     // hava yalnız oyunun başına dönüşte değişir (görevi yeniden başlatınca olduğu gibi kalır)
     if (m) {
@@ -473,8 +517,9 @@ class Game {
       this.missions.start(m);
     } else {
       P.respawn(190.5, 52, -Math.PI / 2);
-      this.cam.yaw = -Math.PI / 2; this.env.hour = randomStartHour(); this.env.randomWeather(); this.env.envTimer = 0;
-      if (!silent) this.hud.notify('Oyunun başına döndün. Paran ve ligin duruyor.', 5);
+      P.enterVehicle(this.startCar);   // başlangıç arabasının içinde
+      this.cam.yaw = this.startCar.heading; this.env.hour = randomStartHour(); this.env.randomWeather(); this.env.envTimer = 0;
+      if (!silent) this.hud.notify('Oyunun başına döndün.', 4);
     }
     this.cam.pitch = 0.18; this._camInit = false;
     this.retryMission = null;
@@ -565,7 +610,7 @@ class Game {
   updateCamera(dt) {
     const P = this.player, cam = this.camera, c = this.cam, inp = this.input;
     // uçuş sahnesi: kamerayı uçak yönetir
-    if (this.flights.camera(cam, dt)) {
+    if (this.flights.camera(cam, dt) || this.drift.camera(cam, dt)) {
       cam.getWorldDirection(this.camForward); this.camForward.y = 0; this.camForward.normalize();
       this._camInit = false;
       return;
@@ -592,8 +637,10 @@ class Game {
     c.lookT = Math.max(0, c.lookT - dt);
     let target, dist, height, lookAhead, shoulder = 0;
     const v = P.vehicle;
+    // nişan: altıpatlar (yayan / at üstünde) ya da yay seçiliyken omuz üstü kamera — nişangâh oyuncunun üstüne düşmesin
+    const aim = !P.dead && ((P.weapon === 'gun' && (!v || v.type === 'horse')) || (P.weapon === 'bow' && !v));
     if (v) {
-      if (c.lookT <= 0) {
+      if (c.lookT <= 0 && !aim) {
         const behind = v.forwardSpeed < -3 && !inp.down('KeyS') ? v.heading : v.heading;
         c.yaw = dampAngle(c.yaw, behind, v.speed > 2 ? 3.2 : 1.2, dt);
         c.pitch = damp(c.pitch, 0.2, 2, dt);
@@ -604,12 +651,14 @@ class Game {
       if (c.far) dist *= 1.6;
       target = new THREE.Vector3(v.pos.x, v.pos.y + (v.type === 'boat' ? 1.6 : 1.3), v.pos.z);
       height = 1.1; lookAhead = 3;
+      if (aim) { dist = 4.6; height = 0.7; shoulder = 1.5; target.y += 0.8; }   // at üstünde: kamera serbest, binicinin sağ omzu
       cam.fov = damp(cam.fov, 68 + clamp(v.speed - 12, 0, 45) * 0.32, 3, dt);
     } else {
       target = new THREE.Vector3(P.pos.x, P.pos.y + 1.55, P.pos.z);
       dist = P.swimming ? 4.2 : 3.4 + (P.speedNow > 6 ? 0.6 : 0);
       height = 0.3; shoulder = 0.6; lookAhead = 0;
       cam.fov = damp(cam.fov, P.speedNow > 6 ? 74 : 68, 4, dt);
+      if (aim) { dist = 2.9; height = 0.25; shoulder = 1.15; }
       if (P.dead) { dist = 6; shoulder = 0; }
     }
     cam.updateProjectionMatrix();
@@ -632,8 +681,8 @@ class Game {
     cam.position.z = damp(cam.position.z, desired.z, k, dt);
     if (v) cam.position.lerp(desired, Math.min(1, dt * 8));
     const look = new THREE.Vector3(fx * cp, -spch * 0.6 - 0.05, fz * cp);
-    const lp = v ? new THREE.Vector3(target.x + fx * lookAhead, target.y + 0.3, target.z + fz * lookAhead) : cam.position.clone().addScaledVector(look, 10);
-    if (!v) lp.y += 0.35;
+    const lp = v && !aim ? new THREE.Vector3(target.x + fx * lookAhead, target.y + 0.3, target.z + fz * lookAhead) : cam.position.clone().addScaledVector(look, 10);
+    if (!v || aim) lp.y += 0.35;
     const sh = this.effects.shake;
     if (sh > 0) cam.position.add(new THREE.Vector3((Math.random() - 0.5) * sh * 0.4, (Math.random() - 0.5) * sh * 0.4, (Math.random() - 0.5) * sh * 0.4));
     cam.lookAt(lp);
@@ -845,6 +894,7 @@ class Game {
       // havaalanı: tabela/uçak tuşları önce (F ve E'yi kendisi alır); uçaktayken oyuncu güncellenmez
       if (this.flights.update(dt, inp)) P.prompt = this.flights.prompt;
       else { P.update(dt, inp, this.cam.yaw); if (this.flights.prompt && !P.prompt) P.prompt = this.flights.prompt; }
+      this.drift.control();   // Drift Park: geri sayımda araç kilitli, el freninden sonra gaz/fren yok
     }
     // araçlar
     for (const v of this.vehicles) {
@@ -856,7 +906,7 @@ class Game {
     this.collidePeds();
     for (const p of this.peds) p.update(dt);
     this.traffic.update(dt);
-    if (this.state === 'play') { this.police.update(dt); this.missions.update(dt); }
+    if (this.state === 'play') { this.police.update(dt); this.missions.update(dt); this.drift.update(dt); }
     this.cleanupVehicles();
     // çevre
     const focus = this.flights.focus() || (P.vehicle ? P.vehicle.pos : P.pos);

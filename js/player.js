@@ -5,7 +5,7 @@ import { buildHumanoid, animate } from './humanoid.js';
 import { shirtTexture } from './textures.js';
 import { WATER_Y } from './world.js';
 import { Ped } from './traffic.js';
-import { swordMesh, bowMesh } from './weapons.js';
+import { swordMesh, bowMesh, revolverMesh, hitsObstacle } from './weapons.js';
 
 export class Player {
   constructor(game, x, z) {
@@ -20,7 +20,8 @@ export class Player {
     this.onGround = true; this.swimming = false; this.punchT = 0; this.prompt = null;
     this.fallT = 0; this.speedNow = 0; this.hurtT = 0;
     // silahlar (Isla Selva köprü ucundaki standdan alınır): weapon = 'fist' | 'sword' | 'bow'
-    this.weapons = { sword: false, bow: false }; this.weapon = 'fist'; this.bowT = 0;
+    this.weapons = { sword: false, bow: false, gun: false }; this.weapon = 'fist'; this.bowT = 0;
+    this.ammo = 0; this.gunT = 0;   // altıpatlar (Banka Soygunu): en çok 6 mermi
   }
   get sword() { return this.weapon === 'sword'; }
   giveWeapons() {
@@ -33,12 +34,49 @@ export class Player {
     this.weapons.sword = this.weapons.bow = true;
     this.weapon = 'bow';
   }
-  // R: sıradaki silah (yumruk → kılıç → yay)
+  // altıpatlar: n mermiyle (en çok 6) eline alır
+  giveGun(n = 6) {
+    if (!this.gunMesh) {
+      this.gunMesh = revolverMesh(); this.gunMesh.position.set(0, -0.32, 0.03); this.gunMesh.rotation.x = Math.PI / 2;
+      this.h.armR.el.add(this.gunMesh);
+    }
+    this.weapons.gun = true; this.ammo = Math.min(6, n); this.weapon = 'gun';
+  }
+  // R: sıradaki silah (yumruk → kılıç → yay → altıpatlar)
   nextWeapon() {
-    const order = ['fist', ...(this.weapons.sword ? ['sword'] : []), ...(this.weapons.bow ? ['bow'] : [])];
+    const order = ['fist', ...(this.weapons.sword ? ['sword'] : []), ...(this.weapons.bow ? ['bow'] : []), ...(this.weapons.gun ? ['gun'] : [])];
     this.weapon = order[(order.indexOf(this.weapon) + 1) % order.length];
-    const names = { fist: 'Yumruk', sword: 'Kılıç', bow: 'Yay' };
+    const names = { fist: 'Yumruk', sword: 'Kılıç', bow: 'Yay', gun: `Altıpatlar (${this.ammo} mermi)` };
     this.game.hud?.notify?.('Silah: ' + names[this.weapon], 1.5);
+  }
+  // altıpatlarla ateş: kameranın baktığı yöne ışın; kovboy, görev hedefleri (şerifin atlıları) ya da duvar
+  fireGun() {
+    const g = this.game, w = g.world;
+    if (this.gunT > 0) return;
+    if (this.ammo <= 0) { g.hud?.notify?.('Mermi bitti!', 1.5); this.gunT = 0.5; return; }
+    this.ammo--; this.gunT = 0.45;
+    const d = new THREE.Vector3(); g.camera.getWorldDirection(d);
+    const o = g.camera.position.clone();
+    if (!this.vehicle) this.heading = Math.atan2(d.x, d.z);
+    // isabet adayları: Wild West kovboyları + süren görevin hedefleri
+    let best = w.west?.life?.rayHit(o, d, 90) || null, kind = best ? 'cowboy' : null;
+    const mh = g.missions.active?.rayHit?.(o, d, 90);
+    if (mh && (!best || mh.t < best.t)) { best = mh; kind = 'mission'; }
+    // engel: ışın boyunca 0,5 m'de bir duvar/zemin
+    const maxT = best ? best.t : 90;
+    let endT = maxT;
+    for (let t = 1.5; t < maxT; t += 0.5) {
+      const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t;
+      if (y < w.surfaceHeight(x, z, y) || hitsObstacle(w, x, y, z)) { endT = t; best = null; break; }
+    }
+    const hx = Math.sin(this.heading), hz = Math.cos(this.heading);
+    const from = new THREE.Vector3(this.pos.x + hx * 0.6, this.pos.y + (this.vehicle ? 2.3 : 1.45), this.pos.z + hz * 0.6);
+    const to = o.clone().addScaledVector(d, endT);
+    g.effects.muzzle(from.x, from.y, from.z, to.x, to.y, to.z);
+    g.audio?.gunshot(from);
+    if (best && kind === 'cowboy') w.west.life.damage(best.c, 50, g, d.x, d.z);
+    else if (best && kind === 'mission') g.missions.active.shot(best, g);
+    else g.effects.sparks?.(to.x, to.y, to.z, 3);
   }
 
   damage(amount, cause) {
@@ -164,6 +202,13 @@ export class Player {
       else if (v.type === 'moto' || v.type === 'wagon') animate(this.h, 'ride', 0, dt);
       else if (v.type === 'boat') animate(this.h, 'boat', 0, dt);
       if (this.swordMesh) this.swordMesh.visible = this.bowMesh.visible = false;
+      // at üstünde altıpatlarla ateş edilebilir (R ile seç, sol tık)
+      this.gunT = Math.max(0, this.gunT - dt);
+      if (v.type === 'horse') {
+        if (input.hit('KeyR') && this.weapons.gun) this.nextWeapon();
+        if (this.weapon === 'gun' && input.clicked) this.fireGun();
+      }
+      if (this.gunMesh) this.gunMesh.visible = v.type === 'horse' && this.weapon === 'gun';
       if (input.hit('KeyF')) this.exitVehicle();
       // motosiklette sert çarpışmada fırla
       return;
@@ -257,7 +302,10 @@ export class Player {
     }
 
     // silah değiştir
-    if (input.hit('KeyR') && (this.weapons.sword || this.weapons.bow)) this.nextWeapon();
+    if (input.hit('KeyR') && (this.weapons.sword || this.weapons.bow || this.weapons.gun)) this.nextWeapon();
+    // altıpatlar
+    this.gunT = Math.max(0, this.gunT - dt);
+    if (this.weapon === 'gun' && input.clicked && !this.swimming && this.fallT <= 0) this.fireGun();
     // yay: ok at (kameranın baktığı yöne, hafif yukarı)
     this.bowT = Math.max(0, this.bowT - dt);
     if (this.weapon === 'bow') {
@@ -277,7 +325,7 @@ export class Player {
     }
     // yumruk / kılıç
     this.punchT = Math.max(0, this.punchT - dt);
-    if (this.weapon !== 'bow' && input.clicked && this.punchT <= 0 && !this.swimming && this.fallT <= 0) {
+    if (this.weapon !== 'bow' && this.weapon !== 'gun' && input.clicked && this.punchT <= 0 && !this.swimming && this.fallT <= 0) {
       this.punchT = 0.42; this.punchHit = false;
     }
     if (this.punchT > 0 && this.punchT < 0.26 && !this.punchHit) {
@@ -285,6 +333,9 @@ export class Player {
       const hx = Math.sin(this.heading), hz = Math.cos(this.heading);
       // kılıçla: Isla Selva hayvanları (geyik, kaplan)
       let hitSomething = !!(this.sword && w.wildlife?.swordHit(this.pos, this.heading, g));
+      // Wild West kovboyları: yumruk 34 hasar (3 yumrukta ölür), kılıç tek darbede
+      const cb = !hitSomething && w.west?.life?.punch(this.pos, this.heading, g);
+      if (cb) { hitSomething = true; if (this.sword) w.west.life.damage(cb, 100, g); }
       for (const p of g.peds) {
         if (p.state === 'dead') continue;
         const dx = p.pos.x - this.pos.x, dz = p.pos.z - this.pos.z;
@@ -313,11 +364,12 @@ export class Player {
     else if (this.fallT > 0) st = 'fall';
     else if (!this.onGround) st = 'jump';
     else if (this.punchT > 0) st = this.sword ? 'slash' : 'punch';
-    else if (this.bowT > 0) st = 'bow';
+    else if (this.bowT > 0 || (this.weapon === 'gun' && this.gunT > 0)) st = 'bow';   // nişan duruşu (kollar önde)
     else if (this.speedNow > 5.5) st = 'run';
     else if (this.speedNow > 0.4) st = 'walk';
     const anim = st === 'walk' && this.speedNow > 3 ? 'run' : st;
-    animate(this.h, anim, this.speedNow, dt, st === 'punch' || st === 'slash' ? 1 - this.punchT / 0.42 : st === 'bow' ? 1 - this.bowT / 0.75 : 0);
+    animate(this.h, anim, this.speedNow, dt, st === 'punch' || st === 'slash' ? 1 - this.punchT / 0.42 : st === 'bow' ? (this.weapon === 'gun' ? 0.3 : 1 - this.bowT / 0.75) : 0);
+    if (this.gunMesh) this.gunMesh.visible = this.weapon === 'gun' && !this.vehicle;
     // elde yalnız seçili silah görünür (araçtayken gizli)
     if (this.swordMesh) {
       this.swordMesh.visible = this.weapon === 'sword' && !this.vehicle; this.bowMesh.visible = this.weapon === 'bow' && !this.vehicle;

@@ -275,7 +275,10 @@ export class WildWest {
     // Grand Hotel: kuzey sırada, girişe yakın; çevresi boş bırakılır
     const HOT = this.hotelLayout(-838, S - (hw + 2.4));
     const gapH = [HOT.x - HOT.W / 2 - 1.5, HOT.x + HOT.W / 2 + 1.5];
-    mainRow(-1, -778, [['al_booth_04', 1], ['vil_store', 1], ['env_generic', 1.1], ['vil_saloon', 1], ['env_saloon', 1.15], ['vil_bank', 1]], [gapN, gapH]);
+    // Banka: kuzey sırada, otelin batısında; girilebilir (soygun görevi için) — eski kapalı vil_bank modelinin yerine
+    const BNK = this.bankLayout(-872, S - (hw + 2.4));
+    const gapB = [BNK.x - BNK.W / 2 - 1.5, BNK.x + BNK.W / 2 + 1.5];
+    mainRow(-1, -778, [['al_booth_04', 1], ['vil_store', 1], ['env_generic', 1.1], ['vil_saloon', 1], ['env_saloon', 1.15]], [gapN, gapH, gapB]);
     mainRow(1, -782, [['vil_sheriff', 1], ['al_booth_01', 1], ['env_saloon', 1.15], ['vil_hotel', 1], ['al_building', 1]], [gapS]);
     this.townEnd = STREET_END;
     // yan yol sırası: yol x = R.x, z0'dan z1'e (dir ±1); side −1 batı (doğuya bakar), +1 doğu (batıya bakar)
@@ -296,7 +299,7 @@ export class WildWest {
     for (let x = -786; x > STREET_END; x -= 22) for (const side of [-1, 1]) {
       const lx = x + (side > 0 ? 11 : 0);
       if ([gapN, gapS].some((q) => lx > q[0] - 1 && lx < q[1] + 1)) continue;
-      if (side < 0 && lx > gapH[0] && lx < gapH[1]) continue;   // otelin sundurması
+      if (side < 0 && [gapH, gapB].some((q) => lx > q[0] && lx < q[1])) continue;   // otelin / bankanın sundurması
       lamp(lx, S + side * (hw + 0.8));
     }
     for (let z = -72; z > -165; z -= 24) lamp(NR.x + NR.hw + 0.8, z);
@@ -447,7 +450,7 @@ export class WildWest {
     // içerideki kovboylar: barmen, barda dikilen, masada oturan
     this.folk = [
       { kind: 'gunman', x: HX - 5, z: FZ - 14.3, heading: 0 },
-      { kind: 'outlaw', x: HX - 3.6, z: FZ - 10.9, heading: Math.PI },
+      { kind: 'outlaw', x: HX - 3.6, z: FZ - 10.9, heading: Math.PI, id: 'barfly' },   // Banka Soygunu: yumrukla öldürülüp silahı alınır
       { kind: 'sheriff', x: this.hotelSeats[0][0], z: this.hotelSeats[0][1], heading: this.hotelSeats[0][2], sit: true },
       { kind: 'outlaw', x: this.hotelSeats[5][0], z: this.hotelSeats[5][1], heading: this.hotelSeats[5][2], sit: true },
     ];
@@ -714,6 +717,249 @@ export class WildWest {
     }
   }
 
+  // ---------- Banka: tek katlı, girilebilir (soygun görevi) ----------
+  // Yerel eksen otelle aynı: lx cadde boyunca (−7..7), lz ön cepheden içeri negatif (−13..0), sundurma 0..2,4.
+  // İç yüzler: lx ±6,7, lz −0,3 … −12,7. Lobi (lz > −5,2) | parmaklıklı vezne tezgâhı (−5,2…−5,9, kapı lx 3,4…4,7) |
+  // tezgâh arkası (…−8,6) | arka bölme: solda kasa dairesi (lx < 0, yuvarlak çelik kapı açık), sağda müdür odası.
+  bankLayout(BX, FZ) {
+    const B = this.bank = { x: BX, z: FZ, W: 14, D: 13, y: ROAD_Y + 0.06 };
+    this.boxes.push([BX - B.W / 2, FZ - B.D, BX + B.W / 2, FZ]);
+    const y = B.y, P = (lx, lz) => [BX + lx, FZ + lz];
+    const put = (kind, lx, lz, ry, s, col = 'circle', dy = 0) => { const [x, z] = P(lx, lz); return this.put(kind, x, z, ry, s, col, y + dy); };
+    // görev noktaları (soygun): kapı önü, vezne penceresi (lobi tarafı), kasa dairesinin içi, para torbaları
+    B.points = { door: P(0, 1.4), counter: P(-3.1, -4.4), vault: P(-3.4, -10.6), loot: P(-4.6, -11.2) };
+    put('env_table3', 0.2, -2.8, 0, 1.25);                     // lobi: yazı masası
+    put('env_bench', -6.0, -2.6, Math.PI / 2, 1.3);            // bekleme bankı
+    put('env_bucket', 2.8, -4.5, 0, 1.3);                      // tükürük kovası
+    for (const lx of BANK_WIN) put('env_seat', lx, -6.5, 0, 1.15);   // veznedar tabureleri
+    put('env_hat', -6.0, -5.55, 0.3, 1.2, null, 1.12);
+    for (const [lx, lz, r] of [[-5.6, -11.5, 0.3], [-4.6, -11.8, 1.2], [-5.2, -10.7, 2.1], [-2.0, -11.8, 0.7]]) put('env_sack', lx, lz, r, 1.5);
+    put('env_chest', -1.3, -9.8, Math.PI / 2, 1.4);            // kasa dairesi: sandık
+    put('env_chair', 2.9, -12.1, 0, 1.15);                     // müdür odası
+    put('env_lamp0', 3.4, -11.35, 0, 1.0, null, 0.8);
+    put('env_gun1', 2.3, -11.4, 0.4, 1.3, null, 0.8);
+    // içeridekiler: veznedar (tezgâh arkasında) + kapı yanında bekçi
+    (this.folk ||= []).push({ kind: 'gunman', x: BX + BANK_WIN[0], z: FZ - 6.9, heading: 0 }, { kind: 'outlaw', x: BX + 5.6, z: FZ - 1.4, heading: -Math.PI / 2 });
+    if (this.dry) return B;
+    const Wd = this.world;
+    // duvar kutusu: ax 'x' (lx boyunca, lz = at) / 'z'; t0..t1 kalınlık aralığı (at'e göre)
+    const wallBox = (ax, at, a, b, v0, v1, t0, t1, tag = 'wall') => {
+      const lo = at + Math.min(t0, t1), hi = at + Math.max(t0, t1), ylo = y + v0 - (v0 === 0 ? 1 : 0);
+      if (ax === 'x') Wd.addBox(BX + a, BX + b, FZ + lo, FZ + hi, ylo, y + v1, tag);
+      else Wd.addBox(BX + lo, BX + hi, FZ + a, FZ + b, ylo, y + v1, tag);
+    };
+    for (const w of this.bankWalls()) {
+      if (w.front) continue;   // yalancı cephe: kimse oraya çıkamaz
+      const inward = w.ax === 'x' ? (w.at === 0 ? -1 : 1) : (w.at < 0 ? 1 : -1);
+      for (const [a, b, v0, v1] of cutHoles(w.u0, w.u1, w.v0, w.v1, w.holes)) if (v1 - v0 >= 0.3) wallBox(w.ax, w.at, a, b, v0, v1, -0.02 * inward, 0.32 * inward);
+    }
+    for (const w of this.bankParts()) for (const [a, b, v0, v1] of cutHoles(w.u0, w.u1, 0, 5, w.holes)) wallBox(w.ax, w.at, a, b, v0, v1, -w.t / 2, w.t / 2);
+    const prop = (x0, x1, z0, z1, h) => Wd.addBox(BX + x0, BX + x1, FZ + z0, FZ + z1, y - 1, y + h, 'prop');
+    for (const [a, b] of BANK_COUNTER) prop(a, b, -5.9, -5.2, 2.5);   // tezgâh + parmaklık (üstünden atlanmaz)
+    prop(4.62, 4.74, -7.2, -5.9, 1.0);                                 // tezgâh kapısı (açık)
+    prop(-5.3, -4.65, -8.45, -6.1, 2.4);                               // kasa kapısı (açık)
+    for (const s of [-1, 1]) prop(s < 0 ? -1.0 : 0.94, s < 0 ? -0.94 : 1.0, -1.3, -0.3, 2.9);   // giriş kapısı kanatları (içe açık)
+    prop(2.0, 3.8, -11.8, -11.0, 0.8);                                 // müdür masası
+    prop(6.0, 6.7, -12.7, -11.9, 0.9);                                 // küçük kasa
+    prop(-6.0, -0.6, -12.7, -12.3, 2.4);                               // altın rafları
+    prop(-6.7, -6.4, -12.3, -9.0, 2.4);                                // kiralık kasa çekmeceleri
+    for (const lx of BANK_COLS) Wd.addCircle(BX + lx, FZ + 2.25, 0.16, y - 1, y + 3.5);
+    return B;
+  }
+  bankWalls() {
+    const W = this.bank.W / 2, D = this.bank.D, G = 5, FF = 7.6;
+    const win = (u, w, v0, v1) => [u - w / 2, u + w / 2, v0, v1];
+    return [
+      { ax: 'x', at: 0, u0: -W, u1: W, v0: 0, v1: G, holes: [[-1, 1, 0, 2.9], win(-4.3, 1.8, 1.1, 3.2), win(4.3, 1.8, 1.1, 3.2)] },
+      { ax: 'x', at: 0, u0: -W, u1: W, v0: G, v1: FF, holes: [], front: true },
+      { ax: 'x', at: -D, u0: -W, u1: W, v0: 0, v1: G, holes: [] },
+      ...[-W, W].map((at) => ({ ax: 'z', at, u0: -D, u1: 0, v0: 0, v1: G, holes: [win(-2.8, 1.2, 1.8, 3.2)] })),
+    ];
+  }
+  // iç bölmeler: tezgâh arkası ile arka odalar arası (kasa kapısı + ofis kapısı), kasa dairesi ile ofis arası.
+  // [0,0,0,0] deliği yalnız lx 0'da böler (solu taş = kasa dairesi, sağı ahşap = ofis)
+  bankParts() {
+    return [
+      { ax: 'x', at: -8.6, u0: -6.7, u1: 6.7, holes: [[-4.7, -2.5, 0, 2.5], [2.9, 4.1, 0, 2.4], [0, 0, 0, 0]], t: 0.4 },
+      { ax: 'z', at: 0, u0: -12.7, u1: -8.8, holes: [], t: 0.3 },
+    ];
+  }
+  bankMesh(scene) {
+    const B = this.bank, y = B.y, hw = B.W / 2, D = B.D;
+    const X = (lx) => B.x + lx, Z = (lz) => B.z + lz;
+    const ext = new TexBox(), int = new TexBox(), floor = new TexBox(), ceil = new TexBox(), trim = new Box(), metal = new Box(), goldB = new Box();
+    const paint = c3('#cfd8cc'), inner = c3('#efe2c6'), white = c3('#ffffff'), green = c3('#24463a'), dark = c3('#2e241a'), iron = c3('#2a2a2c');
+    const brass = c3('#c9a34a'), wood = c3('#5a3a24'), wood2 = c3('#704a2e'), stone = c3('#6c6862'), steel = c3('#6d7278'), red = c3('#7a2420'), gold = c3('#f0c040');
+    const glass = [];
+    // dış duvarlar: dış kaplama (boyalı ahşap) + iç kaplama; pencerelerde yeşil çerçeve, demir parmaklık, cam
+    for (const w of this.bankWalls()) {
+      const inward = w.ax === 'x' ? (w.at === 0 ? -1 : 1) : (w.at < 0 ? 1 : -1);
+      for (const [a, b, v0, v1] of cutHoles(w.u0, w.u1, w.v0, w.v1, w.holes)) {
+        const layers = [[ext, 0, 0.15, paint]]; if (!w.front) layers.push([int, 0.15, 0.3, inner]);
+        for (const [L, t0, t1, col] of layers) {
+          const p0 = w.at + inward * t0, p1 = w.at + inward * t1, lo = Math.min(p0, p1), hi = Math.max(p0, p1);
+          if (w.ax === 'x') L.box(X(a), y + v0, Z(lo), X(b), y + v1, Z(hi), col);
+          else L.box(X(lo), y + v0, Z(a), X(hi), y + v1, Z(b), col);
+        }
+      }
+      for (const h of w.holes) {
+        if (h[2] === 0) continue;   // kapı
+        const [a, b, v0, v1] = h, t = 0.09;
+        const fb = (u0, u1, w0, w1, col, d0 = -0.34, d1 = 0.04) => {   // duvar düzleminde kutu (d: dışa doğru)
+          if (w.ax === 'x') trim.box(X(u0), y + w0, Z(w.at + d0), X(u1), y + w1, Z(w.at + d1), col);
+          else { const s = w.at < 0 ? -1 : 1; trim.box(X(w.at + Math.min(d0 * s, d1 * s)), y + w0, Z(u0), X(w.at + Math.max(d0 * s, d1 * s)), y + w1, Z(u1), col); }
+        };
+        fb(a - t, b + t, v0 - t - 0.06, v0, green); fb(a - t, b + t, v1, v1 + t, green); fb(a - t, a, v0, v1, green); fb(b, b + t, v0, v1, green);
+        for (let u = a + 0.15; u < b - 0.05; u += 0.2) fb(u - 0.02, u + 0.02, v0, v1, iron, -0.02, 0.03);   // parmaklık
+        fb(a, b, v0 + (v1 - v0) * 0.5 - 0.02, v0 + (v1 - v0) * 0.5 + 0.02, iron, -0.02, 0.03);
+        glass.push({ ax: w.ax, at: w.at, a, b, v0, v1 });
+      }
+    }
+    // iç bölmeler: kasa tarafı taş (iki yüz), ofis tarafı ahşap
+    for (const w of this.bankParts()) for (const [a, b, v0, v1] of cutHoles(w.u0, w.u1, 0, 4.9, w.holes)) {
+      const vault = w.ax === 'z' || b <= 0.01, L = vault ? trim : int, col = vault ? stone : inner, h = w.t / 2;
+      if (w.ax === 'x') L.box(X(a), y + v0, Z(w.at - h), X(b), y + v1, Z(w.at + h), col);
+      else L.box(X(w.at - h), y + v0, Z(a), X(w.at + h), y + v1, Z(b), col);
+    }
+    // zemin, tavan, çatı, sundurma
+    floor.box(X(-hw + 0.15), y - 0.06, Z(-D + 0.15), X(hw - 0.15), y, Z(-0.15), c3('#e9dcc4'));
+    floor.box(X(-hw), y - 0.06, Z(0), X(hw), y, Z(2.4), white);
+    ceil.box(X(-hw + 0.15), y + 4.9, Z(-D + 0.15), X(hw - 0.15), y + 5.0, Z(-0.15), white);
+    ext.box(X(-hw), y + 5, Z(-D), X(hw), y + 5.2, Z(0), paint);
+    floor.box(X(-hw - 0.2), y + 3.5, Z(0), X(hw + 0.2), y + 3.62, Z(2.6), c3('#b89a78'));   // saçak
+    for (const lx of BANK_COLS) trim.box(X(lx - 0.11), y, Z(2.14), X(lx + 0.11), y + 3.5, Z(2.36), green);
+    // yalancı cephe tepesi, kat bandı, köşe pilastırları, kapı pervazı + içe açık kanatlar
+    trim.box(X(-hw - 0.15), y + 7.5, Z(-0.3), X(hw + 0.15), y + 7.75, Z(0.15), dark);
+    trim.box(X(-2.2), y + 7.75, Z(-0.2), X(2.2), y + 8.3, Z(0.05), green);
+    trim.box(X(-2.35), y + 8.25, Z(-0.3), X(2.35), y + 8.45, Z(0.12), dark);
+    trim.box(X(-hw - 0.1), y + 4.95, Z(-0.3), X(hw + 0.1), y + 5.12, Z(0.1), green);
+    for (const lx of [-hw, hw]) trim.box(X(lx - 0.18), y, Z(-0.3), X(lx + 0.18), y + 7.6, Z(0.12), green);
+    trim.box(X(-1.15), y, Z(-0.32), X(-1.0), y + 3.05, Z(0.08), green); trim.box(X(1.0), y, Z(-0.32), X(1.15), y + 3.05, Z(0.08), green);
+    trim.box(X(-1.15), y + 2.9, Z(-0.32), X(1.15), y + 3.05, Z(0.08), green);
+    for (const s of [-1, 1]) {
+      const x0 = s < 0 ? -1.0 : 0.94;
+      trim.box(X(x0), y + 0.02, Z(-1.3), X(x0 + 0.06), y + 2.88, Z(-0.3), wood2);
+      trim.box(X(x0 - 0.01), y + 1.7, Z(-1.15), X(x0 + 0.07), y + 2.6, Z(-0.45), c3('#9fb6c0'));   // kanat camı
+    }
+    // vezne tezgâhı + parmaklıklı kafes (iki pencere), tezgâh kapısı (açık)
+    for (const [a, b] of BANK_COUNTER) {
+      trim.box(X(a), y, Z(-5.9), X(b), y + 1.05, Z(-5.2), wood2);
+      trim.box(X(a), y + 1.05, Z(-5.95), X(b), y + 1.12, Z(-5.15), wood);
+      trim.box(X(a), y + 0.1, Z(-5.21), X(b), y + 0.2, Z(-5.17), green);
+      for (let u = a + 0.08; u < b; u += 0.16) {
+        const inWin = BANK_WIN.some((c) => Math.abs(u - c) < 0.5);
+        trim.box(X(u - 0.015), y + (inWin ? 1.8 : 1.12), Z(-5.57), X(u + 0.015), y + 2.5, Z(-5.53), brass);
+      }
+      trim.box(X(a), y + 2.48, Z(-5.6), X(b), y + 2.55, Z(-5.5), brass);
+    }
+    for (const c of BANK_WIN) {
+      trim.box(X(c - 0.52), y + 1.76, Z(-5.6), X(c + 0.52), y + 1.82, Z(-5.5), brass);
+      trim.box(X(c - 0.5), y + 1.12, Z(-5.3), X(c + 0.5), y + 1.15, Z(-5.12), brass);   // para tepsisi
+    }
+    trim.box(X(4.62), y + 0.05, Z(-7.2), X(4.72), y + 1.0, Z(-5.9), wood2);
+    // duvar saati (tezgâh arkası bölmede, lobiden görünür)
+    trim.box(X(1.1), y + 3.0, Z(-8.42), X(1.9), y + 3.8, Z(-8.38), dark);
+    trim.box(X(1.17), y + 3.07, Z(-8.39), X(1.83), y + 3.73, Z(-8.36), white);
+    trim.box(X(1.48), y + 3.4, Z(-8.36), X(1.52), y + 3.66, Z(-8.34), dark); trim.box(X(1.5), y + 3.38, Z(-8.36), X(1.72), y + 3.42, Z(-8.34), dark);
+    // kasa kapısı çerçevesi (çelik)
+    metal.box(X(-4.9), y, Z(-8.42), X(-4.7), y + 2.7, Z(-8.36), steel); metal.box(X(-2.5), y, Z(-8.42), X(-2.3), y + 2.7, Z(-8.36), steel);
+    metal.box(X(-4.9), y + 2.5, Z(-8.42), X(-2.3), y + 2.7, Z(-8.36), steel);
+    // kasa dairesi: taş zemin, altın rafları, kiralık kasa çekmeceleri, yerde altın yığını
+    trim.box(X(-6.7), y + 0.005, Z(-12.7), X(-0.15), y + 0.02, Z(-8.8), c3('#6f6a62'));
+    for (const sy of [0.9, 1.6, 2.3]) metal.box(X(-6.0), y + sy - 0.05, Z(-12.7), X(-0.6), y + sy, Z(-12.3), iron);
+    for (const lx of [-6.0, -3.3, -0.6]) metal.box(X(lx - 0.04), y, Z(-12.7), X(lx + 0.04), y + 2.4, Z(-12.3), iron);
+    const bar = (lx, by, lz) => goldB.box(X(lx - 0.13), by, Z(lz - 0.07), X(lx + 0.13), by + 0.08, Z(lz + 0.07), gold);
+    for (const sy of [0.9, 1.6, 2.3]) for (let lx = -5.75, k = 0; lx < -0.8; lx += 0.34, k++) {
+      if ((k * 7 + sy * 10) % 5 === 1) continue;   // aralarda boşluk
+      const n = 1 + ((k + Math.round(sy * 10)) % 3);
+      for (let j = 0; j < n; j++) { bar(lx, y + sy + j * 0.08, -12.58); bar(lx, y + sy + j * 0.08, -12.42); }
+    }
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 3 - (i > 1 ? 1 : 0); j++) bar(-3.1 + j * 0.3, y + 0.02 + i * 0.08, -11.6 + (i % 2) * 0.16);
+    metal.box(X(-6.7), y + 0.3, Z(-12.3), X(-6.42), y + 2.4, Z(-9.0), c3('#4a4c50'));
+    for (let r = 0; r < 7; r++) for (let c = 0; c < 10; c++) {
+      const v0 = 0.36 + r * 0.29, u0 = -12.24 + c * 0.32;
+      metal.box(X(-6.42), y + v0, Z(u0), X(-6.39), y + v0 + 0.25, Z(u0 + 0.28), steel);
+      trim.box(X(-6.39), y + v0 + 0.1, Z(u0 + 0.12), X(-6.36), y + v0 + 0.14, Z(u0 + 0.16), brass);
+    }
+    // müdür odası: masa, küçük kasa, halı, tablo
+    trim.box(X(2.0), y, Z(-11.8), X(3.8), y + 0.74, Z(-11.0), wood2);
+    trim.box(X(1.95), y + 0.74, Z(-11.85), X(3.85), y + 0.8, Z(-10.95), wood);
+    metal.box(X(6.0), y, Z(-12.7), X(6.7), y + 0.9, Z(-11.9), c3('#3a3d40'));
+    trim.box(X(6.25), y + 0.45, Z(-11.9), X(6.45), y + 0.65, Z(-11.86), brass);
+    trim.box(X(1.4), y + 0.01, Z(-12.2), X(5.4), y + 0.025, Z(-9.4), c3('#2f5a44'));
+    trim.box(X(6.66), y + 2.0, Z(-10.9), X(6.7), y + 3.0, Z(-9.7), brass); trim.box(X(6.64), y + 2.08, Z(-10.82), X(6.66), y + 2.92, Z(-9.78), c3('#4a6a7a'));
+    // lobi: halı, duvarda iki tablo
+    trim.box(X(-2.6), y + 0.01, Z(-4.7), X(2.6), y + 0.03, Z(-0.9), red);
+    trim.box(X(-2.4), y + 0.03, Z(-4.5), X(2.4), y + 0.035, Z(-1.1), c3('#b8862e'));
+    trim.box(X(-2.2), y + 0.035, Z(-4.3), X(2.2), y + 0.04, Z(-1.3), red);
+    for (const s of [-1, 1]) {
+      trim.box(X(s * 6.7 - 0.02), y + 2.2, Z(-4.6), X(s * 6.7 + 0.02), y + 3.2, Z(-3.8), brass);
+      trim.box(X(s * 6.68 - 0.02), y + 2.28, Z(-4.52), X(s * 6.68 + 0.02), y + 3.12, Z(-3.88), c3(s < 0 ? '#5a4a3a' : '#3a4a5a'));
+    }
+    // asma lambalar: lobi (2), tezgâh arkası, kasa dairesi, ofis
+    const bulbs = [];
+    for (const [lx, lz] of [[-3, -2.8], [3, -2.8], [-1.5, -7.2], [-3.4, -10.7], [3.2, -10.3]]) {
+      trim.box(X(lx - 0.02), y + 4.25, Z(lz - 0.02), X(lx + 0.02), y + 4.9, Z(lz + 0.02), dark);
+      trim.box(X(lx - 0.24), y + 4.2, Z(lz - 0.24), X(lx + 0.24), y + 4.32, Z(lz + 0.24), green);
+      bulbs.push([X(lx), y + 4.12, Z(lz)]);
+    }
+    const kit = this.kit, tex = (m) => kit?.tex[m] || null, add = (m) => { scene.add(m); return m; };
+    add(ext.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, map: tex('wood2'), roughness: 0.85 })));
+    add(int.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, map: tex('wood3'), roughness: 0.85 })));
+    add(floor.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, map: tex('wood4'), roughness: 0.8, side: THREE.DoubleSide })));
+    add(ceil.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, map: tex('wood0'), roughness: 0.9, side: THREE.DoubleSide })));
+    add(trim.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 })));
+    const steelMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.6, envMapIntensity: 0.5 });
+    add(metal.mesh(steelMat));
+    add(goldB.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.8, envMapIntensity: 0.8, emissive: '#5a3a00', emissiveIntensity: 0.25 })));
+    // pencere camları (otelinkiyle aynı malzeme)
+    const gm = this.glassMat || new THREE.MeshStandardMaterial({ color: '#9fb6c0', roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
+    for (const gl of glass) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(gl.b - gl.a, gl.v1 - gl.v0), gm);
+      const off = gl.ax === 'x' ? -0.1 : (gl.at < 0 ? 0.1 : -0.1);
+      if (gl.ax === 'x') m.position.set(X((gl.a + gl.b) / 2), y + (gl.v0 + gl.v1) / 2, Z(gl.at + off));
+      else { m.position.set(X(gl.at + off), y + (gl.v0 + gl.v1) / 2, Z((gl.a + gl.b) / 2)); m.rotation.y = Math.PI / 2; }
+      m.renderOrder = 2; scene.add(m);
+    }
+    // yuvarlak çelik kasa kapısı: menteşe deliğin sol kenarında, lobiye doğru ~103° açık
+    {
+      const pivot = new THREE.Group(); pivot.position.set(X(-4.7), y + 1.25, Z(-8.4));
+      const dm = new THREE.MeshStandardMaterial({ color: '#7d8288', roughness: 0.35, metalness: 0.7, envMapIntensity: 0.5 });
+      const bm = new THREE.MeshStandardMaterial({ color: '#c9a34a', roughness: 0.35, metalness: 0.8, envMapIntensity: 0.6 });
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.38, 32).rotateX(Math.PI / 2), dm);
+      disc.position.set(1.15, 0, 0); pivot.add(disc);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.22, 16).rotateX(Math.PI / 2), bm); hub.position.set(1.15, 0, 0.28); pivot.add(hub);
+      for (let k = 0; k < 3; k++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.07, 0.07), bm); sp.position.set(1.15, 0, 0.34); sp.rotation.z = k * Math.PI / 3; pivot.add(sp); }
+      for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2, st = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.06, 8).rotateX(Math.PI / 2), bm); st.position.set(1.15 + Math.cos(a) * 0.95, Math.sin(a) * 0.95, 0.21); pivot.add(st); }
+      for (const v of [-0.6, 0.6]) { const hg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.3), dm); hg.position.set(0, v, 0); pivot.add(hg); }
+      pivot.rotation.y = -1.8;
+      pivot.traverse((o) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+      scene.add(pivot);
+    }
+    // tabela: "BANK"
+    {
+      const c = document.createElement('canvas'); c.width = 1024; c.height = 256;
+      const g = c.getContext('2d');
+      g.fillStyle = '#24463a'; g.fillRect(0, 0, 1024, 256);
+      g.strokeStyle = '#e9c46a'; g.lineWidth = 12; g.strokeRect(16, 16, 992, 224);
+      g.fillStyle = '#f2d27a'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = '900 150px Georgia, serif'; g.fillText('BANK', 512, 112);
+      g.font = '700 40px Georgia, serif'; g.fillText('· SAVINGS & GOLD · EST. 1871 ·', 512, 205);
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+      this.bankSignMat = new THREE.MeshStandardMaterial({ map: t, roughness: 0.6, emissive: '#ffffff', emissiveMap: t, emissiveIntensity: 0 });
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(9, 2.25), this.bankSignMat);
+      m.position.set(X(0), y + 6.3, Z(0.03)); scene.add(m);
+    }
+    // ampuller + iç ışıklar (lobi, kasa dairesi)
+    this.bankBulbMat = new THREE.MeshBasicMaterial({ color: '#ffd28a', toneMapped: false });
+    const bgeo = new THREE.SphereGeometry(0.1, 6, 5), bim = new THREE.InstancedMesh(bgeo, this.bankBulbMat, bulbs.length), o = new THREE.Object3D();
+    bulbs.forEach(([bx, by, bz], i) => { o.position.set(bx, by, bz); o.updateMatrix(); bim.setMatrixAt(i, o.matrix); });
+    bim.computeBoundingSphere(); scene.add(bim);
+    const L1 = new THREE.PointLight('#ffb466', 0, 16, 1.6); L1.position.set(X(0), y + 4.0, Z(-4)); scene.add(L1);
+    const L2 = new THREE.PointLight('#ffc070', 0, 9, 1.6); L2.position.set(X(-3.4), y + 3.8, Z(-10.6)); scene.add(L2);
+    this.bankLights = [[L1, 4, 18], [L2, 3, 8]];
+  }
+
   // kare ağılın (al_animal_fence, 7,65 m) dört kenarı: çarpışma kutuları
   fenceRing(cx, cz, s) {
     if (this.dry) return;
@@ -731,6 +977,7 @@ export class WildWest {
     this.layout();
     if (this.kit) this.buildInstances(scene);
     if (this.hotel) this.hotelMesh(scene);
+    if (this.bank) this.bankMesh(scene);
     this.buildLights(scene);
     this.life = new WestLife(this, scene, this.kit?.chars, this.world.animalKit);
     for (const o of scene.children) if (!before.has(o)) o.userData.west = true;
@@ -795,6 +1042,11 @@ export class WildWest {
       this.glassMat.emissiveIntensity = n * 0.55; this.curtainMat.emissiveIntensity = n * 0.7;
       this.signMat.emissiveIntensity = n * 0.45;   // tabela gece aydınlık (fenerle aydınlatılmış gibi)
       this.hotelBulbMat.color.setRGB(1, 0.82, 0.54).multiplyScalar(0.6 + n * 2.6);
+    }
+    if (this.bankLights) {
+      for (const [L, day, night] of this.bankLights) L.intensity = day + n * night;
+      this.bankSignMat.emissiveIntensity = n * 0.45;
+      this.bankBulbMat.color.setRGB(1, 0.82, 0.54).multiplyScalar(0.6 + n * 2.6);
     }
   }
 
@@ -983,6 +1235,10 @@ function furnBox(f) {
 }
 // Grand Hotel sundurma direkleri (yerel lx; kapı ±0,85 arası boş)
 const HOTEL_COLS = [-10.6, -5.4, -1.6, 1.6, 5.4, 10.6];
+// Banka (yerel lx): sundurma direkleri, vezne tezgâhı parçaları (arada lx 3,4…4,7 tezgâh kapısı), vezne pencereleri
+const BANK_COLS = [-6.8, -3.2, 3.2, 6.8];
+const BANK_COUNTER = [[-6.7, 3.4], [4.7, 6.7]];
+const BANK_WIN = [-3.1, 0.7];
 // sabit (tohumlu) seçim: aynı yerleşim her açılışta aynı
 const rndPick = (seed, arr) => arr[Math.abs(Math.floor(seed * 7.31)) % arr.length];
 // [u0,u1]×[v0,v1] duvarından delikleri ([a,b,c,d] = u a..b, v c..d) çıkar → kalan dikdörtgenler [a,b,v0,v1]

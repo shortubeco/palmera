@@ -136,6 +136,7 @@ export class Police {
   }
   // suç bildirimi
   crime(type, x, z) {
+    if (this.game.drift?.active) return;   // Drift Park sırasında suç/aranma yok
     const add = { assault: 1, carjack: 1, kill: 4, copHit: 5, copKill: 9, explode: 3, ram: 2, cophurt: 3 }[type] || 1;
     const g = this.game;
     const copSaw = this.copsNear(x, z, 50);

@@ -13,8 +13,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0618; col
   background: linear-gradient(180deg, #14062e 0%, #4a1460 55%, #ff4f9a 100%); transition: opacity 0.6s;
 }
 #loading.done { opacity: 0; pointer-events: none; }
-.ld-logo { font: italic 900 64px Impact, "Arial Black", sans-serif; color: #bff4ff; letter-spacing: 4px; text-shadow: 0 4px 0 #ff3fa4; transform: rotate(-3deg); }
-.ld-logo span { font: 400 64px "Brush Script MT", "Segoe Script", cursive; color: #ff3fa4; text-shadow: 0 0 18px #ff3fa4; letter-spacing: 0; }
+.ld-logo { font: italic 900 min(64px, 8vw) Impact, "Arial Black", sans-serif; color: #bff4ff; letter-spacing: 4px; text-shadow: 0 4px 0 #ff3fa4; transform: rotate(-3deg); }
+.ld-logo span { font: 400 min(64px, 8vw) "Brush Script MT", "Segoe Script", cursive; color: #ff3fa4; text-shadow: 0 0 18px #ff3fa4; letter-spacing: 0; }
 .ld-text { font: italic 900 34px Impact, "Arial Black", sans-serif; letter-spacing: 3px; color: #fff; text-shadow: 0 3px 0 #000; }
 .ld-dots i { font-style: normal; animation: ld-blink 1.2s infinite; opacity: 0.2; }
 .ld-dots i:nth-child(2) { animation-delay: 0.2s; } .ld-dots i:nth-child(3) { animation-delay: 0.4s; }
@@ -40,7 +40,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0618; col
 }
 .logo { text-align: center; position: relative; transform: rotate(-4deg); }
 .logo-top {
-  font: italic 900 108px/0.9 Impact, "Arial Black", sans-serif; letter-spacing: 6px;
+  font: italic 900 min(108px, 10.5vw)/0.9 Impact, "Arial Black", sans-serif; letter-spacing: 6px;   /* "GRAND DRIFT" dar ekrana sığsın */
   background: linear-gradient(180deg, #e8fbff 0%, #8fe9ff 45%, #2a6fd8 52%, #b7f2ff 75%, #ffffff 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
   -webkit-text-stroke: 2px #1b0f3a; filter: drop-shadow(0 6px 0 #ff3fa4) drop-shadow(0 0 30px rgba(41, 231, 255, 0.5));
@@ -72,7 +72,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0618; col
 /* sağ üst: oyuncunun ligi (eski kalplerin yeri) */
 #leaguebadge { line-height: 1.1; margin-bottom: 4px; }
 #leaguebadge b { display: block; font: italic 900 24px Impact, "Arial Black", sans-serif; letter-spacing: 2px; color: #ffd23f; text-shadow: 0 2px 0 #000, 0 0 12px rgba(255, 210, 63, 0.5); }
-#leaguebadge small { font: 700 14px Arial, sans-serif; color: #fff; text-shadow: 0 1px 0 #000; }
+#leaguebadge small { display: block; font: 700 14px Arial, sans-serif; color: #fff; text-shadow: 0 1px 0 #000; }   /* her bilgi ayrı satır (en yüksek puan, en iyi süre) */
 #stars small { font: italic 900 16px Impact, "Arial Black", sans-serif; letter-spacing: 2px; color: #ffe36e; text-shadow: 0 2px 0 #000; vertical-align: middle; margin-right: 8px; }
 /* görev sırasında: azalan lig ödülü + geçen süre (üst orta) */
 #mreward { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); text-align: center; display: none; text-shadow: 0 3px 0 #000; }
@@ -171,6 +171,40 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0618; col
 .pbox p { color: #d9c9f0; max-width: 360px; }
 .pcontrols { text-align: left; margin-top: 6px; }
 .pcontrols .ph { font: italic 900 18px Impact, sans-serif; color: var(--pink); letter-spacing: 1px; border-bottom: 1px solid rgba(255, 63, 164, 0.35); padding-bottom: 2px; }
+/* park oyunu seçimi (ESC → Diğer oyunlar): landing kartlarıyla aynı görünüm */
+#parkpick { position: fixed; inset: 0; z-index: 31; background: rgba(13, 6, 24, 0.88); display: flex; overflow-y: auto; }
+#parkpick.hidden { display: none; }
+.ppbox { margin: auto; padding: 20px; width: min(1080px, 100%); text-align: center; display: flex; flex-direction: column; gap: 16px; align-items: center; }
+.ppbox h2 { margin: 0; font: italic 900 44px Impact, "Arial Black", sans-serif; color: var(--cyan); text-shadow: 0 0 18px var(--cyan); }
+.ppbox > button { font: italic 900 26px Impact, "Arial Black", sans-serif; letter-spacing: 3px; padding: 10px 44px; cursor: pointer; color: #1b0f3a; background: #c9c3d8; border: 0; border-radius: 4px; }
+.ppgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; width: 100%; }
+.ppgrid .pcard { display: flex; flex-direction: column; border-radius: 10px; overflow: hidden; border: 2px solid rgba(255, 63, 164, 0.55); background: #0d0618; cursor: pointer; text-align: left;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45); transition: transform 0.15s, border-color 0.15s; }
+.ppgrid .pcard:hover { transform: translateY(-4px); border-color: var(--cyan); }
+.ppgrid .pcard.now { border-color: var(--gold); }
+.ppgrid .pimg { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: linear-gradient(180deg, #2a0f5c 0%, #7a2a8c 38%, #ff5fa2 55%, #ffb36b 62%, #3a1a4a 62.5%, #1c1030 100%); }
+.ppgrid .psun { position: absolute; left: 50%; top: 30%; width: 34%; aspect-ratio: 1; transform: translateX(-50%); border-radius: 50%;
+  background: repeating-linear-gradient(180deg, #ffe27a 0 9%, transparent 9% 12%), linear-gradient(#ffe27a, #ff6fa8); -webkit-mask: linear-gradient(#000 0 52%, transparent 52%); mask: linear-gradient(#000 0 52%, transparent 52%); opacity: .9; }
+.ppgrid .proad { position: absolute; left: 50%; bottom: 0; width: 120%; height: 38%; transform: translateX(-50%); background: #24203a; clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%); }
+.ppgrid .proad::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(180deg, #ffd23f 0 8%, transparent 8% 18%); clip-path: polygon(49.6% 0, 50.4% 0, 51.2% 100%, 48.8% 100%); }
+.ppgrid .pspot { position: absolute; left: 63%; bottom: 7%; width: 13%; height: 17%; border: 3px solid #ffd21a; transform: skewX(-24deg); box-shadow: 0 0 12px rgba(255, 210, 26, .6); }
+.ppgrid .plevel { position: absolute; top: 10px; right: 10px; padding: 3px 10px; border-radius: 20px; font: 800 13px Arial, sans-serif; letter-spacing: 1px; text-transform: uppercase; color: #0d0618; }
+.ppgrid .lv-easy .plevel { background: #3ddc84; } .ppgrid .lv-mid .plevel { background: #ffd23f; } .ppgrid .lv-hard .plevel { background: #ff4f6d; color: #fff; }
+.ppgrid .ptitle { position: absolute; left: 12px; top: 10px; font: italic 900 22px Impact, "Arial Black", sans-serif; letter-spacing: 1px; color: #bff4ff; text-shadow: 0 2px 0 var(--pink), 0 0 10px rgba(0,0,0,.6); }
+.ppgrid .pinfo { flex: 1; min-height: 40px; padding: 9px 12px 4px; font-size: 14px; color: #ffd1ec; }
+.ppgrid .pbest { padding: 0 12px 8px; font-size: 13px; color: #bbb; } .ppgrid .pbest b { color: var(--gold); }
+.ppgrid .pbtn { display: block; margin: 0 12px 12px; padding: 8px 0; text-align: center; font: italic 900 30px Impact, "Arial Black", sans-serif; letter-spacing: 3px; color: #1b0f3a;
+  background: linear-gradient(90deg, var(--cyan), var(--pink)); border-radius: 4px; box-shadow: 0 0 16px rgba(255, 63, 164, 0.45); }
+@media (max-width: 760px) { .ppgrid { grid-template-columns: 1fr; } }
+/* ESC menüsündeki düğmeler eşit genişlikte */
+#pause .pbox > button { width: min(400px, 88vw); padding-left: 0; padding-right: 0; }
+.pcontrols.car { grid-template-columns: repeat(2, auto); }   /* yalnız araç tuşları (Drift Park): 2 sütun */
+.pcontrols.car .ph { grid-column: 1 / -1; }
+/* tuş listesi: her tuş klavye tuşu gibi kare kutuda */
+.controls kbd { display: inline-block; min-width: 24px; height: 24px; padding: 0 5px; margin-right: 4px; box-sizing: border-box; vertical-align: middle;
+  font: 700 14px/22px Arial, sans-serif; text-align: center; color: var(--cyan); background: rgba(41, 231, 255, 0.08);
+  border: 1px solid rgba(41, 231, 255, 0.7); border-bottom-width: 3px; border-radius: 5px; }
+.controls kbd.wide { min-width: 64px; }
 #over { position: fixed; inset: 0; z-index: 30; background: rgba(13, 6, 24, 0.72); display: flex; align-items: center; justify-content: center; }
 .obox { text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .obox h2 { font: italic 900 80px Impact, "Arial Black", sans-serif; margin: 0; letter-spacing: 4px; -webkit-text-stroke: 3px #000; text-shadow: 0 6px 0 #000; }
@@ -207,7 +241,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0618; col
 @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.1); } }
 
 @media (max-width: 760px) {
-  .logo-top { font-size: 64px; } .logo-bottom { font-size: 60px; margin-left: 80px; margin-top: -14px; }
+  .logo-top { font-size: 10.5vw; } .logo-bottom { font-size: 60px; margin-left: 80px; margin-top: -14px; }
   .controls { grid-template-columns: repeat(2, auto); font-size: 12px; }
   #minimap { width: 150px; height: 150px; } #mapwrap { width: 150px; } #hpbar { width: 130px; }
 }

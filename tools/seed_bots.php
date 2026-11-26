@@ -13,6 +13,7 @@ $pdo->exec('ALTER TABLE players ADD COLUMN IF NOT EXISTS bot BOOLEAN NOT NULL DE
 echo 'silinen bot: ', deleteBots($pdo), "\n";
 if (in_array('--sil', $argv, true)) exit;
 echo 'eklenen bot: ', seedBots($pdo, random_int(1, 1 << 30)), "\n";
+echo 'Drift Park bot rekoru: ', seedParkBots($pdo, random_int(1, 1 << 30), true), "\n";   // botlar silinince park rekorları da gider (ON DELETE CASCADE)
 foreach (LEAGUES as $i => $L) {
     $n = $pdo->query("SELECT count(*) FROM players WHERE league = $i")->fetchColumn();
     $t = $pdo->query("SELECT count(*) FROM best_times WHERE mission_key = '" . missionKey($i, 1) . "'")->fetchColumn();

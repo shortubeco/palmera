@@ -35,6 +35,7 @@ const HOOF_WALK = [[0.05, 1], [0.3, 0.8], [0.55, 1], [0.8, 0.8]];
 
 // ---------- hazır araç modelleri (assets/web/vehicles.json + .bin) ----------
 // Oyun türü → model. Polis ve taksi sedan gövdesine tabela/lamba eklenerek yapılır.
+const HB_DECEL = 5;   // el freni: oransal frene ek sabit yavaşlama (m/sn²)
 const MODEL_OF = { sport: 'sport', sedan: 'sedan', taxi: 'sedan', police: 'sedan', hatch: 'hatch', pickup: 'pickup', van: 'van', boat: 'boat' };
 let VKIT = null;
 // Modelin sivri burnu zaten +Z'de (ölçüldü: +Z ucu yarım genişlik ~0,8 m, -Z kıç aynası ~1,2 m) → çevirme yok.
@@ -442,7 +443,12 @@ export class Vehicle {
         if (vF > 0.5) vF -= cfg.brake * brk * dt;
         else if (vF > -cfg.reverse) vF -= cfg.accel * 0.6 * brk * dt;
       }
-      if (c.handbrake) vF = damp(vF, 0, isBoat ? 0.4 : 0.9, dt);
+      if (c.handbrake) {
+        vF = damp(vF, 0, isBoat ? 0.4 : 0.9, dt);
+        // kilitli arka tekerlek: oransal frene ek sabit yavaşlama → düşük hızda araç sürünmeden durur
+        // (yalnız oransal frenle 15 km/sa'ten 2–3 sn, 4–5 m kayıyordu; Drift Park'ta hedefi tutturmayı zorlaştırıyordu)
+        if (!isBoat) vF -= Math.sign(vF) * Math.min(Math.abs(vF), HB_DECEL * dt);
+      }
       // sürtünme
       const roll = isBoat ? 0.35 : 0.05;
       vF -= vF * roll * dt + vF * Math.abs(vF) * (isBoat ? 0.003 : 0.0007) * dt;

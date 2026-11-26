@@ -186,6 +186,9 @@ export class HUD {
     const g = this.game, o = g.missions.objective;
     if (!o || o.kind === 'water') { this.route = null; return; }
     const w = g.world, P = g.player.pos;
+    // hedefin kendi rotası varsa (Drift Park: köşe noktaları) GPS onu izler — en yakın kavşağa giden kısa yol
+    // park yerini geçip geri döndürüyordu
+    if (o.path) { this.route = [[P.x, P.z], ...o.path, [o.x, o.z]]; return; }
     const a = nearestNode(w, P.x, P.z), b = nearestNode(w, o.x, o.z);
     const path = shortestPath(w, a.id, b.id).map((id) => [w.nodes[id].x, w.nodes[id].z]);
     this.route = [[P.x, P.z], ...path, [o.x, o.z]];
